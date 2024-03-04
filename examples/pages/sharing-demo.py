@@ -3,7 +3,7 @@
 import streamlit as st
 
 try:
-    import streamlit_analytics2 as streamlit
+    import streamlit_analytics2 as streamlit_analytics
 except ImportError:
     # Install streamlit-analytics on first run (not included in requirements.txt).
     import subprocess

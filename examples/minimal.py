@@ -15,7 +15,7 @@ st.write(f"Streamlit version: {streamlit_version}")
 
 st.markdown("---")
 
-with streamlit_analytics.track():
+with streamlit_analytics.track(verbose=True):
     st.text_input("Write your name")
     st.selectbox("Select your favorite", ["cat", "dog", "flower"])
     st.button("Click me")

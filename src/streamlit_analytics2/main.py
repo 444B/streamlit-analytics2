@@ -324,8 +324,7 @@ def start_tracking(
     # }
 
     if verbose:
-        print()
-        print("Tracking script execution with streamlit-analytics...")
+        print("\nTracking script execution with streamlit-analytics...")
 
 
 def stop_tracking(

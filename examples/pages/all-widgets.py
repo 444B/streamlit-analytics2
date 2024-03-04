@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit_analytics2 as streamlit
+import streamlit_analytics2 as streamlit_analytics
 from datetime import datetime
 
 with streamlit_analytics.track(verbose=True):
