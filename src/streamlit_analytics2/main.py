@@ -88,7 +88,9 @@ def _track_user():
     counts["total_script_runs"] += 1
     counts["per_day"][today_iso]["script_runs"] += 1
     # Handle the last_time calculation.
-    if "last_time" in st.session_state and isinstance(st.session_state["last_time"], str):
+    if "last_time" in st.session_state and isinstance(
+        st.session_state["last_time"], str
+    ):
         try:
             last_time = datetime.datetime.fromisoformat(st.session_state["last_time"])
             time_spent = (now_utc - last_time).total_seconds()
@@ -109,6 +111,7 @@ def _wrap_checkbox(func):
     """
     Wrap st.checkbox.
     """
+
     def new_func(label, *args, **kwargs):
         checked = func(label, *args, **kwargs)
         label = replace_empty(label)
@@ -118,6 +121,7 @@ def _wrap_checkbox(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = checked
         return checked
+
     return new_func
 
 
@@ -125,6 +129,7 @@ def _wrap_button(func):
     """
     Wrap st.button.
     """
+
     def new_func(label, *args, **kwargs):
         clicked = func(label, *args, **kwargs)
         label = replace_empty(label)
@@ -134,6 +139,7 @@ def _wrap_button(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = clicked
         return clicked
+
     return new_func
 
 
@@ -141,6 +147,7 @@ def _wrap_file_uploader(func):
     """
     Wrap st.file_uploader.
     """
+
     def new_func(label, *args, **kwargs):
         uploaded_file = func(label, *args, **kwargs)
         label = replace_empty(label)
@@ -154,6 +161,7 @@ def _wrap_file_uploader(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = bool(uploaded_file)
         return uploaded_file
+
     return new_func
 
 
@@ -162,6 +170,7 @@ def _wrap_select(func):
     Wrap a streamlit function that returns one selected element out of multiple options,
     e.g. st.radio, st.selectbox, st.select_slider.
     """
+
     def new_func(label, options, *args, **kwargs):
         orig_selected = func(label, options, *args, **kwargs)
         label = replace_empty(label)
@@ -176,6 +185,7 @@ def _wrap_select(func):
             counts["widgets"][label][selected] += 1
         st.session_state.state_dict[label] = selected
         return orig_selected
+
     return new_func
 
 
@@ -184,6 +194,7 @@ def _wrap_multiselect(func):
     Wrap a streamlit function that returns multiple selected elements out of multiple
     options, e.g. st.multiselect.
     """
+
     def new_func(label, options, *args, **kwargs):
         selected = func(label, options, *args, **kwargs)
         label = replace_empty(label)
@@ -199,6 +210,7 @@ def _wrap_multiselect(func):
                 counts["widgets"][label][sel] += 1
         st.session_state.state_dict[label] = selected
         return selected
+
     return new_func
 
 
@@ -208,6 +220,7 @@ def _wrap_value(func):
     e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
     st.time_input, st.color_picker.
     """
+
     def new_func(label, *args, **kwargs):
         value = func(label, *args, **kwargs)
         if label not in counts["widgets"]:
@@ -230,6 +243,7 @@ def _wrap_value(func):
             counts["widgets"][label][formatted_value] += 1
         st.session_state.state_dict[label] = formatted_value
         return value
+
     return new_func
 
 
@@ -239,6 +253,7 @@ def _wrap_chat_input(func):
     e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
     st.time_input, st.color_picker.
     """
+
     def new_func(placeholder, *args, **kwargs):
         value = func(placeholder, *args, **kwargs)
         if placeholder not in counts["widgets"]:
@@ -250,6 +265,7 @@ def _wrap_chat_input(func):
             counts["widgets"][placeholder][formatted_value] += 1
         st.session_state.state_dict[placeholder] = formatted_value
         return value
+
     return new_func
 
 
@@ -433,8 +449,8 @@ def stop_tracking(
         firestore.save(counts, firestore_key_file, firestore_collection_name)
     # Dump the counts to json file if `save_to_json` is set.
     # TODO: Make sure this is not locked if writing from multiple threads.
-# Assuming 'counts' is your data to be saved and 'save_to_json' is the path
-# to your json file.
+    # Assuming 'counts' is your data to be saved and 'save_to_json' is the path
+    # to your json file.
     if save_to_json is not None:
         # Create a Path object for the file
         file_path = Path(save_to_json)

@@ -51,8 +51,10 @@ def show_results(counts, reset_callback, unsafe_password=None):
         col3.metric(
             "Time spent",
             utils.format_seconds(counts["total_time_seconds"]),
-            help=("Time from initial page load to last widget interaction, "
-                  "summed over all users."),
+            help=(
+                "Time from initial page load to last widget interaction, "
+                "summed over all users."
+            ),
         )
         st.write("")
 
@@ -132,8 +134,7 @@ def show_results(counts, reset_callback, unsafe_password=None):
                     "I'm absolutely sure that I want to reset the results",
                 ],
             )
-            if reset_prompt == ("I'm absolutely sure that I want to reset the"
-                                " results"):
+            if reset_prompt == ("I'm absolutely sure that I want to reset the results"):
                 reset_clicked = st.button("Click here to reset")
                 if reset_clicked:
                     reset_callback()

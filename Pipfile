@@ -12,6 +12,11 @@ streamlit-analytics2 = {editable = true, path = "."}
 
 [dev-packages]
 black = "*"
+isort = "*"
+flake8 = "*"
+mypy = "*"
+bandit = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.8"
