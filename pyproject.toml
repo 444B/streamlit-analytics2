@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamlit_analytics2"
-version = "0.5.3"
+version = "0.6.1"
 description = "Track & visualize user interactions with your streamlit app."
 authors = [{ name = "444B", email = "contact+pypi@444b.me" }]
 license = { file = "LICENSE" }
@@ -26,7 +26,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "streamlit >= 1.30.0",
+    "streamlit >= 1.31.0",
     "pandas",
     "altair",
     "google-cloud-firestore"

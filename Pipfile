@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-streamlit = ">=1.30"
+streamlit = ">=1.31"
 altair = "*"
 pandas = "*"
 google-cloud-firestore = "*"

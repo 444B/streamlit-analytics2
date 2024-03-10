@@ -1,4 +1,16 @@
 import platform
+import sys
+import os
+
+# Get the directory of the current script
+current_script_path = os.path.dirname(os.path.abspath(__file__))
+
+# Construct the path to the 'src' directory
+src_directory_path = os.path.join(current_script_path, '..', 'src')
+
+# Add the 'src' directory to sys.path at the first position
+sys.path.insert(0, src_directory_path)
+
 import streamlit as st
 import streamlit_analytics2 as streamlit_analytics
 
@@ -19,9 +31,8 @@ with streamlit_analytics.track(verbose=True):
     st.text_input("Write your name")
     st.selectbox("Select your favorite", ["cat", "dog", "flower"])
     st.button("Click me")
-
-
-    st.markdown("---")
-    st.write(streamlit_analytics.counts)
-    st.markdown("---")
-
+    prompt = st.chat_input("Send a prompt to the bot")
+    if prompt:
+        st.write(f"User has sent the following prompt: {prompt}")
+    
+    st.title("A [link]()")

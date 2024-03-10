@@ -49,6 +49,13 @@ _orig_date_input = st.date_input
 _orig_time_input = st.time_input
 _orig_file_uploader = st.file_uploader
 _orig_color_picker = st.color_picker
+# new elements, testing
+# _orig_download_button = st.download_button
+# _orig_link_button = st.link_button
+# _orig_page_link = st.page_link
+# _orig_toggle = st.toggle
+# _orig_camera_input = st.camera_input
+_orig_chat_input = st.chat_input
 
 _orig_sidebar_button = st.sidebar.button
 _orig_sidebar_checkbox = st.sidebar.checkbox
@@ -64,6 +71,13 @@ _orig_sidebar_date_input = st.sidebar.date_input
 _orig_sidebar_time_input = st.sidebar.time_input
 _orig_sidebar_file_uploader = st.sidebar.file_uploader
 _orig_sidebar_color_picker = st.sidebar.color_picker
+# new elements, testing
+# _orig_sidebar_download_button = st.sidebar.download_button
+# _orig_sidebar_link_button = st.sidebar.link_button
+# _orig_sidebar_page_link = st.sidebar.page_link
+# _orig_sidebar_toggle = st.sidebar.toggle
+# _orig_sidebar_camera_input = st.sidebar.camera_input
+
 
 
 
@@ -240,6 +254,30 @@ def _wrap_value(func):
 
     return new_func
 
+def _wrap_chat_input(func):
+    """
+    Wrap a streamlit function that returns a single value (str/int/float/datetime/...),
+    e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
+    st.time_input, st.color_picker.
+    """
+
+    def new_func(placeholder, *args, **kwargs):
+        value = func(placeholder, *args, **kwargs)
+        if placeholder not in counts["widgets"]:
+            counts["widgets"][placeholder] = {}
+
+        formatted_value = str(value)
+
+        if formatted_value not in counts["widgets"][placeholder]:
+            counts["widgets"][placeholder][formatted_value] = 0
+
+        if formatted_value != st.session_state.state_dict.get(placeholder):
+            counts["widgets"][placeholder][formatted_value] += 1
+        st.session_state.state_dict[placeholder] = formatted_value
+        return value
+
+    return new_func
+
 
 def start_tracking(
     verbose: bool = False,
@@ -305,6 +343,13 @@ def start_tracking(
     st.time_input = _wrap_value(_orig_time_input)
     st.file_uploader = _wrap_file_uploader(_orig_file_uploader)
     st.color_picker = _wrap_value(_orig_color_picker)
+    # new elements, testing
+    # st.download_button = _wrap_value(_orig_download_button)
+    # st.link_button = _wrap_value(_orig_link_button)
+    # st.page_link = _wrap_value(_orig_page_link)
+    # st.toggle = _wrap_value(_orig_toggle)
+    # st.camera_input = _wrap_value(_orig_camera_input)
+    st.chat_input = _wrap_chat_input(_orig_chat_input)
 
     st.sidebar.button = _wrap_button(_orig_sidebar_button)
     st.sidebar.checkbox = _wrap_checkbox(_orig_sidebar_checkbox)
@@ -320,6 +365,13 @@ def start_tracking(
     st.sidebar.time_input = _wrap_value(_orig_sidebar_time_input)
     st.sidebar.file_uploader = _wrap_file_uploader(_orig_sidebar_file_uploader)
     st.sidebar.color_picker = _wrap_value(_orig_sidebar_color_picker)
+    # new elements, testing
+    # st.sidebar.download_button = _wrap_value(_orig_sidebar_download_button)
+    # st.sidebar.link_button = _wrap_value(_orig_sidebar_link_button)
+    # st.sidebar.page_link = _wrap_value(_orig_sidebar_page_link)
+    # st.sidebar.toggle = _wrap_value(_orig_sidebar_toggle)
+    # st.sidebar.camera_input = _wrap_value(_orig_sidebar_camera_input)
+
 
     # replacements = {
     #     "button": _wrap_bool,
@@ -378,6 +430,13 @@ def stop_tracking(
     st.time_input = _orig_time_input
     st.file_uploader = _orig_file_uploader
     st.color_picker = _orig_color_picker
+    # new elements, testing
+    # st.download_button = _orig_download_button
+    # st.link_button = _orig_link_button
+    # st.page_link = _orig_page_link
+    # st.toggle = _orig_toggle
+    # st.camera_input = _orig_camera_input
+    st.chat_input = _orig_chat_input
 
     st.sidebar.button = _orig_sidebar_button
     st.sidebar.checkbox = _orig_sidebar_checkbox
@@ -393,6 +452,12 @@ def stop_tracking(
     st.sidebar.time_input = _orig_sidebar_time_input
     st.sidebar.file_uploader = _orig_sidebar_file_uploader
     st.sidebar.color_picker = _orig_sidebar_color_picker
+    # new elements, testing
+    # st.sidebar.download_button = _orig_sidebar_download_button
+    # st.sidebar.link_button = _orig_sidebar_link_button
+    # st.sidebar.page_link = _orig_sidebar_page_link
+    # st.sidebar.toggle = _orig_sidebar_toggle
+    # st.sidebar.camera_input = _orig_sidebar_camera_input
 
     # Save count data to firestore.
     # TODO: Maybe don't save on every iteration but on regular intervals in a background
