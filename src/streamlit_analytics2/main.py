@@ -7,6 +7,8 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Union
+from collections import defaultdict
+
 
 import streamlit as st
 
@@ -64,24 +66,37 @@ _orig_sidebar_file_uploader = st.sidebar.file_uploader
 _orig_sidebar_color_picker = st.sidebar.color_picker
 
 
+
 def _track_user():
-    """Track individual pageviews by storing user id to session state."""
-    today = str(datetime.date.today())
-    if counts["per_day"]["days"][-1] != today:
-        # TODO: Insert 0 for all days between today and last entry.
-        counts["per_day"]["days"].append(today)
-        counts["per_day"]["pageviews"].append(0)
-        counts["per_day"]["script_runs"].append(0)
+    now_utc = datetime.datetime.utcnow()
+    today_iso = now_utc.date().isoformat()
+
+    # Ensure the day's record exists.
+    if today_iso not in counts["per_day"]:
+        counts["per_day"][today_iso] = {"pageviews": 0, "script_runs": 0}
+
+    # Increment script runs for today.
     counts["total_script_runs"] += 1
-    counts["per_day"]["script_runs"][-1] += 1
-    now = datetime.datetime.now()
-    counts["total_time_seconds"] += (now - st.session_state.last_time).total_seconds()
-    st.session_state.last_time = now
-    if not st.session_state.user_tracked:
-        st.session_state.user_tracked = True
+    counts["per_day"][today_iso]["script_runs"] += 1
+
+    # Handle the last_time calculation.
+    if "last_time" in st.session_state and isinstance(st.session_state["last_time"], str):
+        try:
+            last_time = datetime.datetime.fromisoformat(st.session_state["last_time"])
+            time_spent = (now_utc - last_time).total_seconds()
+            counts["total_time_seconds"] += time_spent
+        except ValueError:
+            # If the last_time is not in proper ISO format, ignore the time spent calculation.
+            pass
+    # Update last_time in the session state to the current time in ISO format.
+    st.session_state["last_time"] = now_utc.isoformat()
+
+    # Track pageview once per user session.
+    if not st.session_state.get("user_tracked", False):
+        st.session_state["user_tracked"] = True
         counts["total_pageviews"] += 1
-        counts["per_day"]["pageviews"][-1] += 1
-        # print("Tracked new user")
+        counts["per_day"][today_iso]["pageviews"] += 1
+
 
 
 def _wrap_checkbox(func):

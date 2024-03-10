@@ -35,3 +35,7 @@ with streamlit_analytics.track(verbose=True):
     st.sidebar.time_input("sidebar_time_input")
     st.sidebar.file_uploader("sidebar_file_uploader")
     st.sidebar.color_picker("sidebar_color_picker")
+
+    st.markdown("---")
+    st.write(streamlit_analytics.counts)
+    st.markdown("---")
