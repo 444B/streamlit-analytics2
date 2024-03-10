@@ -78,7 +78,7 @@ pipenv --python 3.8
 ```
 
 ### 5. Install Dependencies
-Install all necessary project dependencies. It is highly reccomended that if you are writing/editing code then to get the dev packages:
+Install all necessary project dependencies. If you are writing/editing code, it is **highly** reccomended that to get the dev packages. You will need them if you intend on contributing code.
 ```sh
 pipenv install --dev
 ```
@@ -90,7 +90,8 @@ pipenv shell
 ```
 
 ### 7. Write code, test new features!
-Please note that the ```examples/minimap.py``` file is set to detect your pathfile and use the local code for ```streamlit_analytics2```. Just change the code in ```src/streamlit/analytics2/``` and it should be used in the example files. Sometimes you might need to CTRL+C and restart streamlit
+Please note that the ```examples/minimap.py``` file is set to detect your file path and use the local code for ```streamlit_analytics2``` instead of a pip installed version. Just change the code in ```src/streamlit/analytics2/...py``` and it should be used in the example files. 
+>[!NOTE]Sometimes you might need to CTRL+C and restart streamlit. I havent yet figured out why save+rerun isnt working as expected.
 
 ### 8. Run a Minimal Example
 Start with running a minimal Streamlit app to ensure everything is set up correctly:

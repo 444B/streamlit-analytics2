@@ -1,6 +1,6 @@
+import os
 import platform
 import sys
-import os
 
 # Get the directory of the current script
 current_script_path = os.path.dirname(os.path.abspath(__file__))
