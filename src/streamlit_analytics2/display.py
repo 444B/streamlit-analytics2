@@ -134,7 +134,7 @@ def show_results(counts, reset_callback, unsafe_password=None):
                     "I'm absolutely sure that I want to reset the results",
                 ],
             )
-            if reset_prompt == ("I'm absolutely sure that I want to reset the results"):
+            if reset_prompt == "I'm absolutely sure that I want to reset the results":
                 reset_clicked = st.button("Click here to reset")
                 if reset_clicked:
                     reset_callback()
