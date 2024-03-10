@@ -17,13 +17,13 @@ import streamlit_analytics2 as streamlit_analytics
 # Get the software versions
 python_version = platform.python_version()
 streamlit_version = st.__version__
-streamlit_analytics_version = streamlit_analytics.__version__
+# streamlit_analytics_version = streamlit_analytics.__version__
 # removing version printing since currently failing. Likely from beta release?
 
 # Print the versions
 st.write(f"Python version: {python_version}")
 st.write(f"Streamlit version: {streamlit_version}")
-st.write(f"streamlit_analytics version: {streamlit_analytics_version}")
+# st.write(f"streamlit_analytics version: {streamlit_analytics_version}")
 
 st.markdown("---")
 

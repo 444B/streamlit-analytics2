@@ -7,7 +7,6 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Union
-from collections import defaultdict
 
 
 import streamlit as st
@@ -79,20 +78,15 @@ _orig_sidebar_color_picker = st.sidebar.color_picker
 # _orig_sidebar_camera_input = st.sidebar.camera_input
 
 
-
-
 def _track_user():
     now_utc = datetime.datetime.utcnow()
     today_iso = now_utc.date().isoformat()
-
     # Ensure the day's record exists.
     if today_iso not in counts["per_day"]:
         counts["per_day"][today_iso] = {"pageviews": 0, "script_runs": 0}
-
     # Increment script runs for today.
     counts["total_script_runs"] += 1
     counts["per_day"][today_iso]["script_runs"] += 1
-
     # Handle the last_time calculation.
     if "last_time" in st.session_state and isinstance(st.session_state["last_time"], str):
         try:
@@ -104,7 +98,6 @@ def _track_user():
             pass
     # Update last_time in the session state to the current time in ISO format.
     st.session_state["last_time"] = now_utc.isoformat()
-
     # Track pageview once per user session.
     if not st.session_state.get("user_tracked", False):
         st.session_state["user_tracked"] = True
@@ -112,12 +105,10 @@ def _track_user():
         counts["per_day"][today_iso]["pageviews"] += 1
 
 
-
 def _wrap_checkbox(func):
     """
     Wrap st.checkbox.
     """
-
     def new_func(label, *args, **kwargs):
         checked = func(label, *args, **kwargs)
         label = replace_empty(label)
@@ -127,7 +118,6 @@ def _wrap_checkbox(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = checked
         return checked
-
     return new_func
 
 
@@ -135,7 +125,6 @@ def _wrap_button(func):
     """
     Wrap st.button.
     """
-
     def new_func(label, *args, **kwargs):
         clicked = func(label, *args, **kwargs)
         label = replace_empty(label)
@@ -145,7 +134,6 @@ def _wrap_button(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = clicked
         return clicked
-
     return new_func
 
 
@@ -153,7 +141,6 @@ def _wrap_file_uploader(func):
     """
     Wrap st.file_uploader.
     """
-
     def new_func(label, *args, **kwargs):
         uploaded_file = func(label, *args, **kwargs)
         label = replace_empty(label)
@@ -167,7 +154,6 @@ def _wrap_file_uploader(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = bool(uploaded_file)
         return uploaded_file
-
     return new_func
 
 
@@ -176,7 +162,6 @@ def _wrap_select(func):
     Wrap a streamlit function that returns one selected element out of multiple options,
     e.g. st.radio, st.selectbox, st.select_slider.
     """
-
     def new_func(label, options, *args, **kwargs):
         orig_selected = func(label, options, *args, **kwargs)
         label = replace_empty(label)
@@ -191,7 +176,6 @@ def _wrap_select(func):
             counts["widgets"][label][selected] += 1
         st.session_state.state_dict[label] = selected
         return orig_selected
-
     return new_func
 
 
@@ -200,7 +184,6 @@ def _wrap_multiselect(func):
     Wrap a streamlit function that returns multiple selected elements out of multiple
     options, e.g. st.multiselect.
     """
-
     def new_func(label, options, *args, **kwargs):
         selected = func(label, options, *args, **kwargs)
         label = replace_empty(label)
@@ -216,7 +199,6 @@ def _wrap_multiselect(func):
                 counts["widgets"][label][sel] += 1
         st.session_state.state_dict[label] = selected
         return selected
-
     return new_func
 
 
@@ -226,7 +208,6 @@ def _wrap_value(func):
     e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
     st.time_input, st.color_picker.
     """
-
     def new_func(label, *args, **kwargs):
         value = func(label, *args, **kwargs)
         if label not in counts["widgets"]:
@@ -236,7 +217,6 @@ def _wrap_value(func):
         if type(value) == tuple and len(value) == 2:
             # Double-ended slider or date input with start/end, convert to str.
             formatted_value = f"{value[0]} - {value[1]}"
-
         # st.date_input and st.time return datetime object, convert to str
         if (
             isinstance(value, datetime.datetime)
@@ -244,15 +224,14 @@ def _wrap_value(func):
             or isinstance(value, datetime.time)
         ):
             formatted_value = str(value)
-
         if formatted_value not in counts["widgets"][label]:
             counts["widgets"][label][formatted_value] = 0
         if formatted_value != st.session_state.state_dict.get(label, None):
             counts["widgets"][label][formatted_value] += 1
         st.session_state.state_dict[label] = formatted_value
         return value
-
     return new_func
+
 
 def _wrap_chat_input(func):
     """
@@ -260,22 +239,17 @@ def _wrap_chat_input(func):
     e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
     st.time_input, st.color_picker.
     """
-
     def new_func(placeholder, *args, **kwargs):
         value = func(placeholder, *args, **kwargs)
         if placeholder not in counts["widgets"]:
             counts["widgets"][placeholder] = {}
-
         formatted_value = str(value)
-
         if formatted_value not in counts["widgets"][placeholder]:
             counts["widgets"][placeholder][formatted_value] = 0
-
         if formatted_value != st.session_state.state_dict.get(placeholder):
             counts["widgets"][placeholder][formatted_value] += 1
         st.session_state.state_dict[placeholder] = formatted_value
         return value
-
     return new_func
 
 
@@ -287,13 +261,11 @@ def start_tracking(
 ):
     """
     Start tracking user inputs to a streamlit app.
-
     If you call this function directly, you NEED to call
     `streamlit_analytics.stop_tracking()` at the end of your streamlit script.
     For a more convenient interface, wrap your streamlit calls in
     `with streamlit_analytics.track():`.
     """
-
     if firestore_key_file and not counts["loaded_from_firestore"]:
         firestore.load(counts, firestore_key_file, firestore_collection_name)
         counts["loaded_from_firestore"] = True
@@ -301,10 +273,9 @@ def start_tracking(
             print("Loaded count data from firestore:")
             print(counts)
             print()
-
     if load_from_json is not None:
         if verbose:
-            print(f"Loading counts from json:", load_from_json)
+            print("Loading counts from json:", load_from_json)
         try:
             with Path(load_from_json).open("r") as f:
                 json_counts = json.load(f)
@@ -317,8 +288,7 @@ def start_tracking(
                 print()
         except FileNotFoundError as e:
             if verbose:
-                print(f"File not found, proceeding with empty counts.")
-
+                print("File not found, proceeding with empty counts.")
     # Reset session state.
     if "user_tracked" not in st.session_state:
         st.session_state.user_tracked = False
@@ -327,7 +297,6 @@ def start_tracking(
     if "last_time" not in st.session_state:
         st.session_state.last_time = datetime.datetime.now()
     _track_user()
-
     # Monkey-patch streamlit to call the wrappers above.
     st.button = _wrap_button(_orig_button)
     st.checkbox = _wrap_checkbox(_orig_checkbox)
@@ -350,7 +319,6 @@ def start_tracking(
     # st.toggle = _wrap_value(_orig_toggle)
     # st.camera_input = _wrap_value(_orig_camera_input)
     st.chat_input = _wrap_chat_input(_orig_chat_input)
-
     st.sidebar.button = _wrap_button(_orig_sidebar_button)
     st.sidebar.checkbox = _wrap_checkbox(_orig_sidebar_checkbox)
     st.sidebar.radio = _wrap_select(_orig_sidebar_radio)
@@ -371,8 +339,6 @@ def start_tracking(
     # st.sidebar.page_link = _wrap_value(_orig_sidebar_page_link)
     # st.sidebar.toggle = _wrap_value(_orig_sidebar_toggle)
     # st.sidebar.camera_input = _wrap_value(_orig_sidebar_camera_input)
-
-
     # replacements = {
     #     "button": _wrap_bool,
     #     "checkbox": _wrap_bool,
@@ -389,7 +355,6 @@ def start_tracking(
     #     "file_uploader": _wrap_file_uploader,
     #     "color_picker": _wrap_value,
     # }
-
     if verbose:
         print("\nTracking script execution with streamlit-analytics...")
 
@@ -437,7 +402,6 @@ def stop_tracking(
     # st.toggle = _orig_toggle
     # st.camera_input = _orig_camera_input
     st.chat_input = _orig_chat_input
-
     st.sidebar.button = _orig_sidebar_button
     st.sidebar.checkbox = _orig_sidebar_checkbox
     st.sidebar.radio = _orig_sidebar_radio
@@ -458,7 +422,6 @@ def stop_tracking(
     # st.sidebar.page_link = _orig_sidebar_page_link
     # st.sidebar.toggle = _orig_sidebar_toggle
     # st.sidebar.camera_input = _orig_sidebar_camera_input
-
     # Save count data to firestore.
     # TODO: Maybe don't save on every iteration but on regular intervals in a background
     #   thread.
@@ -468,26 +431,20 @@ def stop_tracking(
             print(counts)
             print()
         firestore.save(counts, firestore_key_file, firestore_collection_name)
-
     # Dump the counts to json file if `save_to_json` is set.
     # TODO: Make sure this is not locked if writing from multiple threads.
-
-# Assuming 'counts' is your data to be saved and 'save_to_json' is the path to your json file.
+# Assuming 'counts' is your data to be saved and 'save_to_json' is the path
+# to your json file.
     if save_to_json is not None:
         # Create a Path object for the file
         file_path = Path(save_to_json)
-        
         # Ensure the directory containing the file exists
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        
         # Open the file and dump the json data
         with file_path.open("w") as f:
             json.dump(counts, f)
-        
         if verbose:
             print("Storing results to file:", save_to_json)
-
-
     # Show analytics results in the streamlit app if `?analytics=on` is set in the URL.
     query_params = st.query_params
     if "analytics" in query_params and "on" in query_params["analytics"]:
@@ -506,19 +463,16 @@ def track(
 ):
     """
     Context manager to start and stop tracking user inputs to a streamlit app.
-
     To use this, wrap all calls to streamlit in `with streamlit_analytics.track():`.
     This also shows the analytics results below your app if you attach
     `?analytics=on` to the URL.
     """
-
     start_tracking(
         verbose=verbose,
         firestore_key_file=firestore_key_file,
         firestore_collection_name=firestore_collection_name,
         load_from_json=load_from_json,
     )
-
     # Yield here to execute the code in the with statement. This will call the wrappers
     # above, which track all inputs.
     yield

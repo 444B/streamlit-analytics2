@@ -136,3 +136,6 @@ dmypy.json
 
 streamlit_analytics2.egg-info
 dist/
+flake8
+tree
+black
