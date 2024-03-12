@@ -1,14 +1,14 @@
 import datetime
 import logging
+import uuid
 
 import streamlit as st
 
+from .config import setup_logging
 from .tracker import counts
 from .utils import format_seconds, replace_empty
 
-# create a list of streamlit widgets
-
-widgets = [st.button, ]
+setup_logging()
 
 # Store original streamlit functions. They will be monkey-patched with some wrappers
 # in `start_tracking` (see wrapper functions below).
@@ -56,6 +56,8 @@ _orig_sidebar_color_picker = st.sidebar.color_picker
 # _orig_sidebar_camera_input = st.sidebar.camera_input
 
 def monkey_patch():
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - monkey_patch - BEGIN")
     # Monkey-patch streamlit to call the wrappers above.
     st.button = _wrap_button(_orig_button)
     st.checkbox = _wrap_checkbox(_orig_checkbox)
@@ -100,7 +102,13 @@ def monkey_patch():
     # st.sidebar.toggle = _wrap_value(_orig_sidebar_toggle)
     # st.sidebar.camera_input = _wrap_value(_orig_sidebar_camera_input)
 
+    logging.debug(f"{unique_id} - monkey_patch - END")
+
+
 def unwrap_original():
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - unwrap_original - BEGIN")
+
     # Reset streamlit functions.
     st.button = _orig_button
     st.checkbox = _orig_checkbox
@@ -145,13 +153,19 @@ def unwrap_original():
     # st.sidebar.toggle = _orig_sidebar_toggle
     # st.sidebar.camera_input = _orig_sidebar_camera_input
 
+    logging.debug(f"{unique_id} - unwrap_original - END")
+
+
 
 def _wrap_checkbox(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_checkbox - BEGIN")
     """
     Wrap st.checkbox.
     """
 
     def new_func(label, *args, **kwargs):
+
         checked = func(label, *args, **kwargs)
         label = replace_empty(label)
         if label not in counts["widgets"]:
@@ -160,11 +174,13 @@ def _wrap_checkbox(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = checked
         return checked
-
+    logging.debug(f"{unique_id} - _wrap_checkbox - END")
     return new_func
 
 
 def _wrap_button(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_button - BEGIN")
     """
     Wrap st.button.
     """
@@ -178,11 +194,13 @@ def _wrap_button(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = clicked
         return clicked
-
+    logging.debug(f"{unique_id} - _wrap_button - END")
     return new_func
 
 
 def _wrap_file_uploader(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_file_uploader - BEGIN")
     """
     Wrap st.file_uploader.
     """
@@ -200,11 +218,13 @@ def _wrap_file_uploader(func):
             counts["widgets"][label] += 1
         st.session_state.state_dict[label] = bool(uploaded_file)
         return uploaded_file
-
+    logging.debug(f"{unique_id} - _wrap_file_uploader - END")
     return new_func
 
 
 def _wrap_select(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_select - BEGIN")
     """
     Wrap a streamlit function that returns one selected element out of multiple options,
     e.g. st.radio, st.selectbox, st.select_slider.
@@ -224,11 +244,13 @@ def _wrap_select(func):
             counts["widgets"][label][selected] += 1
         st.session_state.state_dict[label] = selected
         return orig_selected
-
+    logging.debug(f"{unique_id} - _wrap_select - END")
     return new_func
 
 
 def _wrap_multiselect(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_multiselect - BEGIN")
     """
     Wrap a streamlit function that returns multiple selected elements out of multiple
     options, e.g. st.multiselect.
@@ -249,11 +271,13 @@ def _wrap_multiselect(func):
                 counts["widgets"][label][sel] += 1
         st.session_state.state_dict[label] = selected
         return selected
-
+    logging.debug(f"{unique_id} - _wrap_multiselect - END")
     return new_func
 
 
 def _wrap_value(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_value - BEGIN")
     """
     Wrap a streamlit function that returns a single value (str/int/float/datetime/...),
     e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
@@ -285,10 +309,13 @@ def _wrap_value(func):
         st.session_state.state_dict[label] = formatted_value
         return value
 
+    logging.debug(f"{unique_id} - _wrap_value - END")
     return new_func
 
 
 def _wrap_chat_input(func):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _wrap_chat_input - BEGIN")
     """
     Wrap a streamlit function that returns a single value (str/int/float/datetime/...),
     e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
@@ -310,4 +337,5 @@ def _wrap_chat_input(func):
         st.session_state.state_dict[placeholder] = formatted_value
         return value
 
+    logging.debug(f"{unique_id} - _wrap_chat_input - END")
     return new_func

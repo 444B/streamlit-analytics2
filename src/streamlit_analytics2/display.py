@@ -2,16 +2,21 @@
 Displays the analytics results within streamlit.
 """
 import logging
+import uuid
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
 from . import utils
+from .config import setup_logging
 from .tracker import counts
 
+setup_logging()
 
 def show_results(counts, reset_callback, unsafe_password=None):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - show_results - BEGIN")
     """Show analytics results in streamlit, asking for password if given."""
 
     # Show header.
@@ -135,3 +140,4 @@ def show_results(counts, reset_callback, unsafe_password=None):
                 if reset_clicked:
                     reset_callback()
                     st.write("Done! Please refresh the page.")
+    logging.debug(f"{unique_id} - show_results - END")

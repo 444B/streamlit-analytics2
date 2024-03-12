@@ -1,9 +1,15 @@
 import logging
+import uuid
 
 from google.cloud import firestore
 
+from .config import setup_logging
+
+setup_logging()
 
 def load(counts, service_account_json, collection_name):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - load - BEGIN")
     """Load count data from firestore into `counts`."""
 
     # Retrieve data from firestore.
@@ -16,11 +22,15 @@ def load(counts, service_account_json, collection_name):
         for key in firestore_counts:
             if key in counts:
                 counts[key] = firestore_counts[key]
+    logging.debug(f"{unique_id} - load - END")
 
 
 def save(counts, service_account_json, collection_name):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - save - BEGIN")
     """Save count data from `counts` to firestore."""
     db = firestore.Client.from_service_account_json(service_account_json)
     col = db.collection(collection_name)
     doc = col.document("counts")
     doc.set(counts)  # creates if doesn't exist
+    logging.debug(f"{unique_id} - save - END")

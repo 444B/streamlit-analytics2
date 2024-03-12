@@ -5,6 +5,7 @@ Main API functions for the user to start and stop analytics tracking.
 import datetime
 import json
 import logging
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional, Union
@@ -12,22 +13,19 @@ from typing import Optional, Union
 import streamlit as st
 
 from . import display, firestore
+from .config import setup_logging
 from .tracker import counts
 from .utils import replace_empty
 from .wrappers import (_wrap_button, _wrap_chat_input, _wrap_checkbox,
                        _wrap_file_uploader, _wrap_multiselect, _wrap_select,
                        _wrap_value)
 
-logging.basicConfig(
-    level=logging.INFO, format="streamlit-analytics2: %(levelname)s: %(message)s"
-)
-
-# Dict that holds all analytics results. Note that this is persistent across users,
-# as modules are only imported once by a streamlit app.
-# counts = {"loaded_from_firestore": False}
+setup_logging()
 
 
 def reset_counts():
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - reset_counts - BEGIN")
     # Use yesterday as first entry to make chart look better.
     yesterday = str(datetime.date.today() - datetime.timedelta(days=1))
     counts["total_pageviews"] = 0
@@ -36,7 +34,7 @@ def reset_counts():
     counts["per_day"] = {"days": [str(yesterday)], "pageviews": [0], "script_runs": [0]}
     counts["widgets"] = {}
     counts["start_time"] = datetime.datetime.now().strftime("%d %b %Y, %H:%M:%S")
-
+    logging.debug(f"{unique_id} - reset_counts - END")
 
 reset_counts()
 
@@ -86,6 +84,9 @@ _orig_sidebar_color_picker = st.sidebar.color_picker
 # _orig_sidebar_camera_input = st.sidebar.camera_input
 
 def _track_user():
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - _track_user - BEGIN")
+
     """Track individual pageviews by storing user id to session state."""
     today = str(datetime.date.today())
     if counts["per_day"]["days"][-1] != today:
@@ -102,7 +103,8 @@ def _track_user():
         st.session_state.user_tracked = True
         counts["total_pageviews"] += 1
         counts["per_day"]["pageviews"][-1] += 1
-        # print("Tracked new user")
+    logging.debug(f"{unique_id} - _track_user - END")
+
 
 
 def start_tracking(
@@ -111,6 +113,9 @@ def start_tracking(
     firestore_collection_name: str = "counts",
     load_from_json: Optional[Union[str, Path]] = None,
 ):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - start_tracking - BEGIN")
+
     """
     Start tracking user inputs to a streamlit app.
 
@@ -202,25 +207,8 @@ def start_tracking(
     # st.sidebar.toggle = _wrap_value(_orig_sidebar_toggle)
     # st.sidebar.camera_input = _wrap_value(_orig_sidebar_camera_input)
 
-    # replacements = {
-    #     "button": _wrap_bool,
-    #     "checkbox": _wrap_bool,
-    #     "radio": _wrap_select,
-    #     "selectbox": _wrap_select,
-    #     "multiselect": _wrap_multiselect,
-    #     "slider": _wrap_value,
-    #     "select_slider": _wrap_select,
-    #     "text_input": _wrap_value,
-    #     "number_input": _wrap_value,
-    #     "text_area": _wrap_value,
-    #     "date_input": _wrap_value,
-    #     "time_input": _wrap_value,
-    #     "file_uploader": _wrap_file_uploader,
-    #     "color_picker": _wrap_value,
-    # }
+    logging.debug(f"{unique_id} - track_user - END")
 
-    if verbose:
-        logging.info("\nTracking script execution with streamlit-analytics...")
 
 
 def stop_tracking(
@@ -230,6 +218,9 @@ def stop_tracking(
     firestore_collection_name: str = "counts",
     verbose: bool = False,
 ):
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - stop_tracking - BEGIN")
+
     """
     Stop tracking user inputs to a streamlit app.
 
@@ -293,9 +284,7 @@ def stop_tracking(
     #   thread.
     if firestore_key_file:
         if verbose:
-            print("Saving count data to firestore:")
-            print(counts)
-            print()
+            logging.info("Saving count data to firestore:")
         firestore.save(counts, firestore_key_file, firestore_collection_name)
 
     # Dump the counts to json file if `save_to_json` is set.
@@ -322,6 +311,9 @@ def stop_tracking(
         st.write("---")
         display.show_results(counts, reset_counts, unsafe_password)
 
+    logging.debug(f"{unique_id} - stop_tracking - END")
+
+
 
 @contextmanager
 def track(
@@ -332,6 +324,10 @@ def track(
     verbose=False,
     load_from_json: Optional[Union[str, Path]] = None,
 ):
+    
+    unique_id = str(uuid.uuid4())[:4]
+    logging.debug(f"{unique_id} - track - BEGIN")
+
     """
     Context manager to start and stop tracking user inputs to a streamlit app.
 
@@ -357,3 +353,5 @@ def track(
         firestore_collection_name=firestore_collection_name,
         verbose=verbose,
     )
+
+    logging.debug(f"{unique_id} - track - END")
