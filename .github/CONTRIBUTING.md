@@ -43,7 +43,6 @@ We use GitHub issues to track public bugs. Report a bug by [opening a new issue]
 
 - We follow the [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guide for Python code.
 - Ensure your code passes the run_checks.sh (described below)
-  ```
 
 ## License
 
