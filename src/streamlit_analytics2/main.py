@@ -13,6 +13,8 @@ import streamlit as st
 
 from . import display, firestore
 from .utils import replace_empty
+from .wrappers import _wrap_button, _wrap_checkbox, _wrap_chat_input, _wrap_file_uploader, _wrap_multiselect, _wrap_select, _wrap_value
+from .tracker import counts
 
 logging.basicConfig(
     level=logging.INFO, format="streamlit-analytics2: %(levelname)s: %(message)s"
@@ -20,7 +22,7 @@ logging.basicConfig(
 
 # Dict that holds all analytics results. Note that this is persistent across users,
 # as modules are only imported once by a streamlit app.
-counts = {"loaded_from_firestore": False}
+# counts = {"loaded_from_firestore": False}
 
 
 def reset_counts():
@@ -81,7 +83,6 @@ _orig_sidebar_color_picker = st.sidebar.color_picker
 # _orig_sidebar_toggle = st.sidebar.toggle
 # _orig_sidebar_camera_input = st.sidebar.camera_input
 
-
 def _track_user():
     """Track individual pageviews by storing user id to session state."""
     today = str(datetime.date.today())
@@ -100,173 +101,6 @@ def _track_user():
         counts["total_pageviews"] += 1
         counts["per_day"]["pageviews"][-1] += 1
         # print("Tracked new user")
-
-
-def _wrap_checkbox(func):
-    """
-    Wrap st.checkbox.
-    """
-
-    def new_func(label, *args, **kwargs):
-        checked = func(label, *args, **kwargs)
-        label = replace_empty(label)
-        if label not in counts["widgets"]:
-            counts["widgets"][label] = 0
-        if checked != st.session_state.state_dict.get(label, None):
-            counts["widgets"][label] += 1
-        st.session_state.state_dict[label] = checked
-        return checked
-
-    return new_func
-
-
-def _wrap_button(func):
-    """
-    Wrap st.button.
-    """
-
-    def new_func(label, *args, **kwargs):
-        clicked = func(label, *args, **kwargs)
-        label = replace_empty(label)
-        if label not in counts["widgets"]:
-            counts["widgets"][label] = 0
-        if clicked:
-            counts["widgets"][label] += 1
-        st.session_state.state_dict[label] = clicked
-        return clicked
-
-    return new_func
-
-
-def _wrap_file_uploader(func):
-    """
-    Wrap st.file_uploader.
-    """
-
-    def new_func(label, *args, **kwargs):
-        uploaded_file = func(label, *args, **kwargs)
-        label = replace_empty(label)
-        if label not in counts["widgets"]:
-            counts["widgets"][label] = 0
-        # TODO: Right now this doesn't track when multiple files are uploaded one after
-        #   another. Maybe compare files directly (but probably not very clever to
-        #   store in session state) or hash them somehow and check if a different file
-        #   was uploaded.
-        if uploaded_file and not st.session_state.state_dict.get(label, None):
-            counts["widgets"][label] += 1
-        st.session_state.state_dict[label] = bool(uploaded_file)
-        return uploaded_file
-
-    return new_func
-
-
-def _wrap_select(func):
-    """
-    Wrap a streamlit function that returns one selected element out of multiple options,
-    e.g. st.radio, st.selectbox, st.select_slider.
-    """
-
-    def new_func(label, options, *args, **kwargs):
-        orig_selected = func(label, options, *args, **kwargs)
-        label = replace_empty(label)
-        selected = replace_empty(orig_selected)
-        if label not in counts["widgets"]:
-            counts["widgets"][label] = {}
-        for option in options:
-            option = replace_empty(option)
-            if option not in counts["widgets"][label]:
-                counts["widgets"][label][option] = 0
-        if selected != st.session_state.state_dict.get(label, None):
-            counts["widgets"][label][selected] += 1
-        st.session_state.state_dict[label] = selected
-        return orig_selected
-
-    return new_func
-
-
-def _wrap_multiselect(func):
-    """
-    Wrap a streamlit function that returns multiple selected elements out of multiple
-    options, e.g. st.multiselect.
-    """
-
-    def new_func(label, options, *args, **kwargs):
-        selected = func(label, options, *args, **kwargs)
-        label = replace_empty(label)
-        if label not in counts["widgets"]:
-            counts["widgets"][label] = {}
-        for option in options:
-            option = replace_empty(option)
-            if option not in counts["widgets"][label]:
-                counts["widgets"][label][option] = 0
-        for sel in selected:
-            sel = replace_empty(sel)
-            if sel not in st.session_state.state_dict.get(label, []):
-                counts["widgets"][label][sel] += 1
-        st.session_state.state_dict[label] = selected
-        return selected
-
-    return new_func
-
-
-def _wrap_value(func):
-    """
-    Wrap a streamlit function that returns a single value (str/int/float/datetime/...),
-    e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
-    st.time_input, st.color_picker.
-    """
-
-    def new_func(label, *args, **kwargs):
-        value = func(label, *args, **kwargs)
-        if label not in counts["widgets"]:
-            counts["widgets"][label] = {}
-
-        formatted_value = replace_empty(value)
-        if type(value) is tuple and len(value) == 2:
-            # Double-ended slider or date input with start/end, convert to str.
-            formatted_value = f"{value[0]} - {value[1]}"
-
-        # st.date_input and st.time return datetime object, convert to str
-        if (
-            isinstance(value, datetime.datetime)
-            or isinstance(value, datetime.date)
-            or isinstance(value, datetime.time)
-        ):
-            formatted_value = str(value)
-
-        if formatted_value not in counts["widgets"][label]:
-            counts["widgets"][label][formatted_value] = 0
-        if formatted_value != st.session_state.state_dict.get(label, None):
-            counts["widgets"][label][formatted_value] += 1
-        st.session_state.state_dict[label] = formatted_value
-        return value
-
-    return new_func
-
-
-def _wrap_chat_input(func):
-    """
-    Wrap a streamlit function that returns a single value (str/int/float/datetime/...),
-    e.g. st.slider, st.text_input, st.number_input, st.text_area, st.date_input,
-    st.time_input, st.color_picker.
-    """
-
-    def new_func(placeholder, *args, **kwargs):
-        value = func(placeholder, *args, **kwargs)
-        if placeholder not in counts["widgets"]:
-            counts["widgets"][placeholder] = {}
-
-        formatted_value = str(value)
-
-        if formatted_value not in counts["widgets"][placeholder]:
-            counts["widgets"][placeholder][formatted_value] = 0
-
-        if formatted_value != st.session_state.state_dict.get(placeholder):
-            counts["widgets"][placeholder][formatted_value] += 1
-        st.session_state.state_dict[placeholder] = formatted_value
-        return value
-
-    return new_func
 
 
 def start_tracking(

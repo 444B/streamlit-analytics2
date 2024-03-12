@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from . import utils
+from .tracker import counts
 
 
 def show_results(counts, reset_callback, unsafe_password=None):
