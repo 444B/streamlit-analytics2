@@ -1,6 +1,7 @@
 """This demo is run through Streamlit Sharing."""
 
 import streamlit as st
+
 import streamlit_analytics2 as streamlit_analytics
 
 with streamlit_analytics.track():

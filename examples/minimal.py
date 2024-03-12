@@ -3,6 +3,7 @@ import platform
 import sys
 
 import streamlit as st
+
 import streamlit_analytics2 as streamlit_analytics
 
 # Get the directory of the current script
@@ -30,7 +31,7 @@ st.markdown("---")
 
 
 # with streamlit_analytics.track(unsafe_password="test123"):
-with streamlit_analytics.track(save_to_json="path/to/file.json"):
+with streamlit_analytics.track(save_to_json="analytic_data.json"):
     st.text_input("Write your name")
     st.selectbox("Select your favorite", ["cat", "dog", "flower"])
     st.button("Click me")

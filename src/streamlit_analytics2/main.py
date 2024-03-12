@@ -12,9 +12,11 @@ from typing import Optional, Union
 import streamlit as st
 
 from . import display, firestore
-from .utils import replace_empty
-from .wrappers import _wrap_button, _wrap_checkbox, _wrap_chat_input, _wrap_file_uploader, _wrap_multiselect, _wrap_select, _wrap_value
 from .tracker import counts
+from .utils import replace_empty
+from .wrappers import (_wrap_button, _wrap_chat_input, _wrap_checkbox,
+                       _wrap_file_uploader, _wrap_multiselect, _wrap_select,
+                       _wrap_value)
 
 logging.basicConfig(
     level=logging.INFO, format="streamlit-analytics2: %(levelname)s: %(message)s"

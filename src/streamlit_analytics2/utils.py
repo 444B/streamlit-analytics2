@@ -1,3 +1,6 @@
+import logging
+
+
 def format_seconds(s: int) -> str:
     """Formats seconds to 00:00:00 format."""
     # days, remainder = divmod(s, 86400)
