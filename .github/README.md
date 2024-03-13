@@ -40,20 +40,37 @@ import streamlit as st
 import streamlit_analytics2 as streamlit_analytics
 
 with streamlit_analytics.track():
-    st.text_input("Write something")
+    st.write("Hello, World!")
     st.button("Click me")
 ```
 
 All interactions are now tracked, supporting all standard Streamlit widgets.
 
+Another way to get the tracking is to call the streamlit_analytics.track() on your main() function:
+```python
+import streamlit as st
+import streamlit_analytics2 as streamlit_analytics
+
+with streamlit_analytics.track():
+    main()
+
+def main():
+    st.write("Hello, World!")
+    st.button("Click me")
+```
+Using streamlit_analytics.track() is the reccomended method and will become the primary way to initiate streamlit-analytics2 after the [upcoming v.1.0.0](https://github.com/444B/streamlit-analytics2/issues/53) release.
+
 ## Moving Forward
 
 - **TODOs and Feature Requests**: We've transitioned our roadmap and feature requests to [GitHub Issues](https://github.com/your-repo/streamlit-analytics2/issues). Feel free to contribute ideas or report bugs!
 - **Advanced Configuration**: Detailed guidance on advanced setup (including password protection and database integration) options are available in our [Project Wiki](https://github.com/444B/streamlit-analytics2/wiki).
+**Improved Performance**: We are focused on providing a use of streamlit-analytics2 that doesn't impact the performance of your app.  
+All suggestions and inputs are welcome on our [forum](https://github.com/444B/streamlit-analytics2/discussions)
 
 ## Contributing
 
 Your contributions are welcome! Please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to make a difference.
+The step by step guide will show you how to set up a dev environment, testing standards and how to make a PR.
 
 ## Security
 

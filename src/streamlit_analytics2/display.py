@@ -1,6 +1,4 @@
-"""
-Displays the analytics results within streamlit.
-"""
+
 import logging
 import uuid
 

@@ -111,8 +111,7 @@ def start_tracking(
     verbose: bool = False,
     firestore_key_file: Optional[str] = None,
     firestore_collection_name: str = "counts",
-    load_from_json: Optional[Union[str, Path]] = None,
-):
+    load_from_json: Optional[Union[str, Path]] = None,):
     unique_id = str(uuid.uuid4())[:4]
     logging.debug(f"{unique_id} - start_tracking - BEGIN")
 
@@ -207,7 +206,7 @@ def start_tracking(
     # st.sidebar.toggle = _wrap_value(_orig_sidebar_toggle)
     # st.sidebar.camera_input = _wrap_value(_orig_sidebar_camera_input)
 
-    logging.debug(f"{unique_id} - track_user - END")
+    logging.debug(f"{unique_id} - start_tracking - END")
 
 
 
@@ -216,8 +215,7 @@ def stop_tracking(
     save_to_json: Optional[Union[str, Path]] = None,
     firestore_key_file: Optional[str] = None,
     firestore_collection_name: str = "counts",
-    verbose: bool = False,
-):
+    verbose: bool = False,):
     unique_id = str(uuid.uuid4())[:4]
     logging.debug(f"{unique_id} - stop_tracking - BEGIN")
 
@@ -322,8 +320,7 @@ def track(
     firestore_key_file: Optional[str] = None,
     firestore_collection_name: str = "counts",
     verbose=False,
-    load_from_json: Optional[Union[str, Path]] = None,
-):
+    load_from_json: Optional[Union[str, Path]] = None,):
     
     unique_id = str(uuid.uuid4())[:4]
     logging.debug(f"{unique_id} - track - BEGIN")
