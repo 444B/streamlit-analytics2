@@ -139,3 +139,4 @@ flake8
 tree
 black
 test_results_*
+analytic_data.json
