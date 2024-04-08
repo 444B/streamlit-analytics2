@@ -206,12 +206,12 @@
         },
         "google-cloud-firestore": {
             "hashes": [
-                "sha256:589ce49c6b8d7315a248327e4a124a44143f5a5314ea768f7c851660c21e6321",
-                "sha256:71b1b32c11e7cb2fa804037865619930655409a49238807a88c244510e5d21c7"
+                "sha256:3347ac38346c2702134d4c81f652a5e3451c840a6237f28b844501bd528e5fd8",
+                "sha256:e61ae70229a6e532e439c8d16447a32024447f2ee4a2303fc4d054c258d6877f"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.7'",
-            "version": "==2.15.0"
+            "version": "==2.16.0"
         },
         "googleapis-common-protos": {
             "hashes": [
