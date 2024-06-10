@@ -1433,7 +1433,7 @@
                 "sha256:f870204a840a60da0b12273ef34f7051e98c3b5961b61b0c2c1be6dfd64fbcd3",
                 "sha256:ffa75af20b44f8dba823498024771d5ac50620e6915abac414251bd971b4529f"
             ],
-            "markers": "python_version >= '3.9'",
+            "markers": "python_version < '3.12' and python_version >= '3.9'",
             "version": "==1.26.4"
         },
         "packaging": {
@@ -1446,12 +1446,12 @@
         },
         "pandas-stubs": {
             "hashes": [
-                "sha256:5d6f64d45a98bc94152a0f76fa648e598cd2b9ba72302fd34602479f0c391a53",
-                "sha256:85b20da44a62c80eb8389bcf4cbfe31cce1cafa8cca4bf1fc75ec45892e72ce8"
+                "sha256:2dcc86e8fa6ea41535a4561c1f08b3942ba5267b464eff2e99caeee66f9e4cd1",
+                "sha256:e08ce7f602a4da2bff5a67475ba881c39f2a4d4f7fccc1cba57c6f35a379c6c0"
             ],
             "index": "pypi",
             "markers": "python_version >= '3.9'",
-            "version": "==2.2.2.240514"
+            "version": "==2.2.2.240603"
         },
         "pathspec": {
             "hashes": [
