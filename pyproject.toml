@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "streamlit_analytics2"
-version = "0.8.0"
+version = "0.7.7"
 description = "Track & visualize user interactions with your streamlit app."
 authors = [{ name = "444B", email = "contact+pypi@444b.me" }]
 license = { file = "LICENSE" }
