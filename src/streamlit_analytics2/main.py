@@ -23,7 +23,9 @@ from .utils import replace_empty
 # as modules are only imported once by a streamlit app.
 counts = {"loaded_from_firestore": False}
 
-logging.info("SA2: Streamlit-analytics2 successfully imported")
+logger = logging.getLogger(__name__)
+
+logger.info("SA2: Streamlit-analytics2 successfully imported")
 
 
 def reset_counts():
@@ -332,18 +334,18 @@ def start_tracking(
             counts.update({k: json_counts[k] for k in json_counts if k in counts})
 
             if verbose:
-                logging.info(f"{log_msg_prefix}{load_from_json}")
-                logging.info("SA2: Success! Loaded counts:")
-                logging.info(counts)
+                logger.info(f"{log_msg_prefix}{load_from_json}")
+                logger.info("SA2: Success! Loaded counts:")
+                logger.info(counts)
 
         except FileNotFoundError:
             if verbose:
-                logging.warning(
+                logger.warning(
                     f"SA2: File {load_from_json} not found, proceeding with empty counts."
                 )
         except Exception as e:
             # Catch-all for any other exceptions, log the error
-            logging.error(f"SA2: Error loading counts from {load_from_json}: {e}")
+            logger.error(f"SA2: Error loading counts from {load_from_json}: {e}")
 
     # Reset session state.
     if "user_tracked" not in st.session_state:
@@ -416,7 +418,7 @@ def start_tracking(
     # }
 
     if verbose:
-        logging.info("\nSA2: Tracking script execution with streamlit-analytics...")
+        logger.info("\nSA2: Tracking script execution with streamlit-analytics...")
 
 
 def stop_tracking(
@@ -437,11 +439,11 @@ def stop_tracking(
     """
 
     if verbose:
-        logging.info("SA2: Finished script execution. New counts:")
-        logging.info(
+        logger.info("SA2: Finished script execution. New counts:")
+        logger.info(
             "%s", counts
         )  # Use %s and pass counts to logging to handle complex objects
-        logging.info("%s", "-" * 80)  # For separators or multi-line messages
+        logger.info("%s", "-" * 80)  # For separators or multi-line messages
 
     # Reset streamlit functions.
     st.button = _orig_button
