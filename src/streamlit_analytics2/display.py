@@ -7,10 +7,10 @@ import pandas as pd
 import streamlit as st
 
 from . import utils
+from .state import data  # noqa: F401
 
 
-@st.dialog("Streamlit-Analytics2", width="large")
-def show_results(counts, reset_callback, unsafe_password=None):
+def show_results(data, reset_callback, unsafe_password=None):  # noqa: F811
     """Show analytics results in streamlit, asking for password if given."""
 
     # Show header.
@@ -37,28 +37,28 @@ def show_results(counts, reset_callback, unsafe_password=None):
     if show:
         # Show traffic.
         st.header("Traffic")
-        st.write(f"since {counts['start_time']}")
+        st.write(f"since {data['start_time']}")
         col1, col2, col3 = st.columns(3)
         col1.metric(
             "Pageviews",
-            counts["total_pageviews"],
+            data["total_pageviews"],
             help="Every time a user (re-)loads the site.",
         )
         col2.metric(
-            "Script runs",
-            counts["total_script_runs"],
+            "Widget Interactions",
+            data["total_script_runs"],
             help="Every time Streamlit reruns upon changes or interactions.",
         )
         col3.metric(
             "Time spent",
-            utils.format_seconds(counts["total_time_seconds"]),
+            utils.format_seconds(data["total_time_seconds"]),
             help=(
                 "Time from initial page load to last widget interaction, summed over all users."
             ),
         )
         st.write("")
 
-        df = pd.DataFrame(counts["per_day"])
+        df = pd.DataFrame(data["per_day"])
         base = alt.Chart(df).encode(
             x=alt.X("monthdate(days):O", axis=alt.Axis(title="", grid=True))
         )
@@ -117,15 +117,15 @@ def show_results(counts, reset_callback, unsafe_password=None):
         # This section controls how the tables on individual widgets are shown
         # Before, it was just a json of k/v pairs
         # There is still room for improvement and PRs are welcome
-        for i in counts["widgets"].keys():
+        for i in data["widgets"].keys():
             st.markdown(f"##### `{i}` Widget Usage")
-            if type(counts["widgets"][i]) is dict:
+            if type(data["widgets"][i]) is dict:
                 st.dataframe(
                     pd.DataFrame(
                         {
                             "widget_name": i,
-                            "selected_value": list(counts["widgets"][i].keys()),
-                            "number_of_interactions": counts["widgets"][i].values(),
+                            "selected_value": list(data["widgets"][i].keys()),
+                            "number_of_interactions": data["widgets"][i].values(),
                         }
                     ).sort_values(by="number_of_interactions", ascending=False)
                 )
@@ -134,7 +134,7 @@ def show_results(counts, reset_callback, unsafe_password=None):
                     pd.DataFrame(
                         {
                             "widget_name": i,
-                            "number_of_interactions": counts["widgets"][i],
+                            "number_of_interactions": data["widgets"][i],
                         },
                         index=[0],
                     ).sort_values(by="number_of_interactions", ascending=False)

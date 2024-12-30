@@ -136,3 +136,8 @@ exclude_lines = [
 [tool.bandit]
 exclude_dirs = ["tests", "docs"]
 skips = ["B311"]
+
+[dependency-groups]
+dev = [
+    "types-toml>=0.10.8.20240310",
+]

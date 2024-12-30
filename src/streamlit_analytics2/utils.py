@@ -34,14 +34,14 @@ def replace_empty(s):
         return s
 
 
-def session_counts_reset() -> Dict[str, Any]:
+def session_data_reset() -> Dict[str, Any]:
     """
-    Reset the session counts to a new session.
+    Reset the session data to a new session.
 
     Returns
     -------
     Dict[str, Any]
-        The new session counts.
+        The new session data.
     """
     # Use yesterday as first entry to make chart look better.
     yesterday = str(datetime.date.today() - datetime.timedelta(days=1))
@@ -56,9 +56,9 @@ def session_counts_reset() -> Dict[str, Any]:
     return output
 
 
-def initialize_session_counts():
+def initialize_session_data():
     """
-    Initialize the session counts if not already initialized.
+    Initialize the session data if not already initialized.
     """
-    if "session_counts" not in ss:
-        ss.session_counts = session_counts_reset()
+    if "session_data" not in ss:
+        ss.session_data = session_data_reset()

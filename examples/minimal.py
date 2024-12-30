@@ -39,3 +39,4 @@ with streamlit_analytics.track():
     st.text_input("Write your name")
     st.selectbox("Select your favorite", ["cat", "dog", "flower"])
     st.button("Click me")
+    streamlit_analytics.data
