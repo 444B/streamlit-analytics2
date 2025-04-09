@@ -7,14 +7,13 @@ import json
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Optional, Union
 
 import streamlit as st
-from streamlit import session_state as ss
 
-from . import config, display, firestore, utils, widgets  # noqa: F811 F401
+from . import config, display, firestore, utils  # noqa: F811 F401
 from . import wrappers as _wrap
-from .state import data, reset_data
+from .state import data, reset_data, session_data
 
 # from streamlit_searchbox import st_searchbox
 
@@ -28,13 +27,13 @@ from .state import data, reset_data
 # logging.info("SA2: Streamlit-analytics2 successfully imported")
 
 
-def update_session_stats(data_dict: Dict[str, Any]):
+def update_session_stats():
     """
     Update the session data with the current state.
 
     Parameters
     ----------
-    data : Dict[str, Any]
+    data_dict : Dict[str, Any]
         Data, either aggregate or session-specific.
 
     Returns
@@ -43,28 +42,58 @@ def update_session_stats(data_dict: Dict[str, Any]):
         Updated data with the current state of time-dependent elements.
     """
     today = str(datetime.date.today())
-    if data_dict["per_day"]["days"][-1] != today:
-        # TODO: Insert 0 for all days between today and last entry.
-        data_dict["per_day"]["days"].append(today)
-        data_dict["per_day"]["pageviews"].append(0)
-        data_dict["per_day"]["script_runs"].append(0)
-    data_dict["total_script_runs"] += 1
-    data_dict["per_day"]["script_runs"][-1] += 1
     now = datetime.datetime.now()
-    data_dict["total_time_seconds"] += (
-        now - st.session_state.last_time
-    ).total_seconds()
+
+    dicts = [data, session_data]
+
+    for d in dicts:
+        # Allow backwards compatiability with old data structure and firestore
+        new_list = [0 for i in range(len(d["per_day"]["days"]))]
+        new_list_widgets = [{} for i in range(len(d["per_day"]["days"]))]
+
+        if d["per_day"]["days"][-1] != today:
+            # Fill in all but last missing day (which will be appended later)
+            if "session_time_seconds" not in d["per_day"]:
+                d["per_day"]["session_time_seconds"] = new_list
+            if "widgets" not in d["per_day"]:
+                d["per_day"]["widgets"] = new_list_widgets
+
+            # TODO: Insert 0 for all days between today and last entry.
+            d["per_day"]["days"].append(today)
+            d["per_day"]["pageviews"].append(0)
+            d["per_day"]["script_runs"].append(0)
+            d["per_day"]["session_time_seconds"].append(0)
+            d["per_day"]["widgets"].append({})
+
+        # Ensure all days have session_time_seconds and widgets even when
+        # per_day includes today already
+        if "session_time_seconds" not in d["per_day"] or len(
+            d["per_day"]["session_time_seconds"]
+        ) < len(d["per_day"]["days"]):
+            d["per_day"]["session_time_seconds"] = new_list
+        if "widgets" not in d["per_day"] or len(d["per_day"]["widgets"]) < len(
+            d["per_day"]["days"]
+        ):
+            d["per_day"]["widgets"] = new_list_widgets
+
+        d["total_script_runs"] += 1
+        d["per_day"]["script_runs"][-1] += 1
+        d["per_day"]["session_time_seconds"][-1] += (
+            now - st.session_state.last_time
+        ).total_seconds()
+
+        d["total_time_seconds"] += (now - st.session_state.last_time).total_seconds()
+        if not st.session_state.user_tracked:
+            d["total_pageviews"] += 1
+            d["per_day"]["pageviews"][-1] += 1
+
+    st.session_state.user_tracked = True
     st.session_state.last_time = now
-    if not st.session_state.user_tracked:
-        st.session_state.user_tracked = True
-        data_dict["total_pageviews"] += 1
-        data_dict["per_day"]["pageviews"][-1] += 1
 
 
 def _track_user():
     """Track individual pageviews by storing user id to session state."""
-    update_session_stats(data)
-    update_session_stats(ss.session_data)
+    update_session_stats()
 
 
 def start_tracking(
@@ -86,7 +115,6 @@ def start_tracking(
     stop_tracking()` at the end of your streamlit script. For a more convenient
     interface, wrap your streamlit calls in `with streamlit_analytics.track():`.
     """
-    utils.initialize_session_data()
 
     if (
         streamlit_secrets_firestore_key is not None
@@ -103,12 +131,13 @@ def start_tracking(
             session_id=session_id,  # This will load global and session data
         )
         data["loaded_from_firestore"] = True
+        session_data["loaded_from_firestore"] = True
         if verbose:
             print("Loaded count data from firestore:")
             print(data)
             if session_id:
                 print("Loaded session count data from firestore:")
-                print(ss.session_data)
+                print(session_data)
             print()
 
     elif firestore_key_file and not data["loaded_from_firestore"]:
@@ -122,6 +151,7 @@ def start_tracking(
             session_id=session_id,
         )
         data["loaded_from_firestore"] = True
+        session_data["loaded_from_firestore"] = True
         if verbose:
             print("Loaded count data from firestore:")
             print(data)
@@ -314,7 +344,7 @@ def stop_tracking(
             print("Saving count data to firestore:")
             print(data)
             print("Saving session count data to firestore:")
-            print(ss.session_data)
+            print(session_data)
             print()
 
         # Save both global and session data in a single call
@@ -508,3 +538,31 @@ if __name__ == "streamlit_analytics2.main":
     # _orig_sidebar_page_link = st.sidebar.page_link
     # _orig_sidebar_toggle = st.sidebar.toggle
     # _orig_sidebar_camera_input = st.sidebar.camera_input
+
+
+def delete_session_data(
+    session_id: str,
+    firestore_collection_name: str,
+    firestore_project_name: Optional[str] = None,
+    firestore_key_file: Optional[str] = None,
+    streamlit_secrets_firestore_key: Optional[str] = None,
+):
+    """Delete session data from firestore."""
+
+    # Don't do anythikng if passed an empty string or None for session_id
+    if session_id is None or session_id == "":
+        print("No session ID provided, skipping deletion")
+        return
+
+    if session_data["loaded_from_firestore"] and firestore_collection_name is None:
+        raise ValueError(
+            "firestore_collection_name must be provided if session data was loaded from firestore"
+        )
+    elif session_data["loaded_from_firestore"]:
+        firestore.delete(
+            session_id,
+            firestore_collection_name,
+            service_account_json=firestore_key_file,
+            streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
+            firestore_project_name=firestore_project_name,
+        )

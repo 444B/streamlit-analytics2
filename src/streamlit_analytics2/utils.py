@@ -1,9 +1,3 @@
-import datetime
-from typing import Any, Dict
-
-from streamlit import session_state as ss
-
-
 def format_seconds(s: int) -> str:
     """Formats seconds to 00:00:00 format."""
     # days, remainder = divmod(s, 86400)
@@ -32,39 +26,3 @@ def replace_empty(s):
         return " "
     else:
         return s
-
-
-def session_data_reset() -> Dict[str, Any]:
-    """
-    Reset the session data to a new session.
-
-    Returns
-    -------
-    Dict[str, Any]
-        The new session data.
-    """
-    # Use yesterday as first entry to make chart look better.
-    yesterday = str(datetime.date.today() - datetime.timedelta(days=1))
-    output: Dict[str, Any] = {}
-    output["total_pageviews"] = 0
-    output["total_script_runs"] = 0
-    output["total_time_seconds"] = 0
-    output["per_day"] = {
-        "days": [str(yesterday)],
-        "pageviews": [0],
-        "script_runs": [0],
-    }
-    output["widgets"] = {}
-    output["start_time"] = datetime.datetime.now().strftime(
-        "%d %b %Y, %H:%M:%S"
-    )  # noqa: E501
-
-    return output
-
-
-def initialize_session_data():
-    """
-    Initialize the session data if not already initialized.
-    """
-    if "session_data" not in ss:
-        ss.session_data = session_data_reset()
