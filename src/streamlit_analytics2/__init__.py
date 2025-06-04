@@ -8,5 +8,5 @@ from .state import data  # noqa: F401
 
 from .state import data as counts  # noqa: F401  # isort:skip
 
-__version__ = "0.10.4"
+__version__ = "0.10.5"
 __name__ = "streamlit_analytics2"
