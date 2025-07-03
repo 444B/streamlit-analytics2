@@ -2,23 +2,30 @@
 enabled = true
 
 [storage]
-save = false
+save = true
 type = "json"
-save_to_json = "path/to/file.json"
-load_from_json = "path/to/file.json"
+save_to_json = "sa2_data/analytics_data.json"
+load_from_json = ""
 
 [logs]
 verbose = false
 
 [access]
-unsafe_password = "hunter2"
+unsafe_password = ""
+password_hash = ""
+require_auth = false
 
 [firestore]
 enabled = false
-firestore_key_file = "firebase-key.json"
+firestore_key_file = ""
 firestore_project_name = ""
-firestore_collection_name = "data"
+firestore_collection_name = "streamlit-analytics2"
 streamlit_secrets_firestore_key = ""
 
 [session]
+enabled = true
 session_id = ""
+
+[setup]
+completed = false
+version = "0.11.0"
