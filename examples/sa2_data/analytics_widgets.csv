@@ -1,0 +1,23 @@
+widget,value,count,timestamp
+Enter your name, ,2,2025-07-03T18:09:55.502682
+Enter your name,skjdfhjshdf,1,2025-07-03T18:09:55.502689
+Select your age,25,2,2025-07-03T18:09:55.502693
+Select your age,60,1,2025-07-03T18:09:55.502695
+Pick a color,#00f900,2,2025-07-03T18:09:55.502698
+Choose your favorite,Python,2,2025-07-03T18:09:55.502700
+Choose your favorite,JavaScript,0,2025-07-03T18:09:55.502702
+Choose your favorite,Go,0,2025-07-03T18:09:55.502704
+Choose your favorite,Rust,0,2025-07-03T18:09:55.502706
+I agree to the terms,Total Interactions,3,2025-07-03T18:09:55.502709
+Submit,Total Interactions,2,2025-07-03T18:09:55.502711
+How should analytics be saved?,JSON (Simple),0,2025-07-03T18:09:55.502713
+How should analytics be saved?,CSV (Excel-friendly),1,2025-07-03T18:09:55.502715
+How should analytics be saved?,Don't save,0,2025-07-03T18:09:55.502717
+Password protect analytics dashboard,Total Interactions,1,2025-07-03T18:09:55.502719
+Set password, ,1,2025-07-03T18:09:55.502721
+Set password,111,1,2025-07-03T18:09:55.502723
+Confirm password, ,1,2025-07-03T18:09:55.502725
+Confirm password,111,1,2025-07-03T18:09:55.502727
+Enter password, ,1,2025-07-03T18:09:55.502729
+Enter password,111,1,2025-07-03T18:09:55.502731
+Cancel,Total Interactions,0,2025-07-03T18:09:55.502733

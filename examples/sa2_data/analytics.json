@@ -1,0 +1,51 @@
+{
+  "loaded_from_firestore": false,
+  "total_pageviews": 1,
+  "total_script_runs": 1,
+  "total_time_seconds": 0.000157,
+  "per_day": {
+    "days": [
+      "2025-07-02",
+      "2025-07-03"
+    ],
+    "pageviews": [
+      0,
+      1
+    ],
+    "script_runs": [
+      0,
+      1
+    ]
+  },
+  "widgets": {
+    "Enter your name": {
+      " ": 1
+    },
+    "Select your age": {
+      "25": 1
+    },
+    "Pick a color": {
+      "#00f900": 1
+    },
+    "Choose your favorite": {
+      "Python": 1,
+      "JavaScript": 0,
+      "Go": 0,
+      "Rust": 0
+    },
+    "I agree to the terms": 1,
+    "Submit": 0
+  },
+  "start_time": "03 Jul 2025, 18:09:22",
+  "sessions": {
+    "960a3493-c5eb-4ac9-846a-dd3606581535": {
+      "id": "960a3493-c5eb-4ac9-846a-dd3606581535",
+      "start_time": "2025-07-03T18:09:22.730592",
+      "last_activity": "2025-07-03T18:09:22.744224",
+      "interactions": 0
+    }
+  },
+  "active_users": {
+    "960a3493-c5eb-4ac9-846a-dd3606581535": "2025-07-03T18:09:22.744270"
+  }
+}
