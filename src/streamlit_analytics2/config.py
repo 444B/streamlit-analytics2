@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any
 import hashlib
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -245,14 +246,16 @@ def show_config():
     
     storage_enabled = st.checkbox(
         "Save analytics data",
-        value=config['storage']['save']
+        value=config['storage']['save'],
+        key="storage_enabled"
     )
     
     storage_type = st.radio(
         "Format",
         ["json", "csv"],
         index=0 if config['storage']['type'] == 'json' else 1,
-        horizontal=True
+        horizontal=True,
+        key="storage_type"
     )
     
     # Security settings
@@ -260,35 +263,87 @@ def show_config():
     
     require_auth = st.checkbox(
         "Require password for analytics",
-        value=config['access']['require_auth']
+        value=config['access']['require_auth'],
+        key="require_auth"
     )
     
     if require_auth:
-        if st.button("Set/Change Password"):
-            with st.form("password_form"):
-                new_pass = st.text_input("New password", type="password")
-                confirm = st.text_input("Confirm password", type="password")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔑 Set/Change Password", type="primary"):
+                st.session_state.show_password_form = True
+        
+        with col2:
+            if st.button("❓ Forgot Password?"):
+                st.session_state.show_password_help = True
+        
+        # Password change form
+        if st.session_state.get('show_password_form', False):
+            with st.container():
+                st.markdown("### Update Password")
+                new_pass = st.text_input("New password", type="password", key="new_pass")
+                confirm = st.text_input("Confirm password", type="password", key="confirm_pass")
                 
-                if st.form_submit_button("Update Password"):
-                    if new_pass and new_pass == confirm:
-                        config['access']['password_hash'] = hashlib.sha256(new_pass.encode()).hexdigest()
-                        config['access']['require_auth'] = True
-                        save_config(config)
-                        st.success("Password updated!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Update Password"):
+                        if not new_pass:
+                            st.error("Please enter a password")
+                        elif new_pass != confirm:
+                            st.error("Passwords don't match")
+                        else:
+                            # Update password immediately
+                            config['access']['password_hash'] = hashlib.sha256(new_pass.encode()).hexdigest()
+                            config['access']['require_auth'] = True
+                            save_config(config)
+                            st.success("✅ Password updated successfully!")
+                            del st.session_state.show_password_form
+                            time.sleep(1)
+                            st.rerun()
+                
+                with col2:
+                    if st.button("Cancel"):
+                        del st.session_state.show_password_form
                         st.rerun()
-                    elif not new_pass:
-                        st.error("Please enter a password")
-                    else:
-                        st.error("Passwords don't match")
+        
+        # Password help
+        if st.session_state.get('show_password_help', False):
+            with st.container():
+                st.markdown("### 🔓 Password Reset Help")
+                st.info(
+                    "To reset your password, you have two options:\n\n"
+                    "**Option 1: Delete the config file**\n"
+                    "```bash\n"
+                    "rm .streamlit/analytics.toml\n"
+                    "```\n"
+                    "Then restart your app and set up a new password.\n\n"
+                    "**Option 2: Edit the config file**\n"
+                    "1. Open `.streamlit/analytics.toml`\n"
+                    "2. Set `require_auth = false` under `[access]`\n"
+                    "3. Save and restart your app\n"
+                    "4. Set a new password from this config screen\n\n"
+                    "[📖 View detailed guide in Wiki](https://github.com/444B/streamlit-analytics2/wiki/Password-Reset)"
+                )
+                if st.button("Close"):
+                    del st.session_state.show_password_help
+                    st.rerun()
     
-    # Save button
-    if st.button("💾 Save Configuration", type="primary"):
+    # Save configuration button
+    st.divider()
+    if st.button("💾 Save Configuration", type="primary", use_container_width=True):
+        # Update config with current values
         config['storage']['save'] = storage_enabled
         config['storage']['type'] = storage_type
         config['access']['require_auth'] = require_auth
         
+        # If disabling auth, clear password
+        if not require_auth:
+            config['access']['password_hash'] = ""
+        
         save_config(config)
         st.success("✅ Configuration saved!")
+        time.sleep(0.5)
         st.rerun()
     
     # Data location info
