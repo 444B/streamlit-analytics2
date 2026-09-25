@@ -1,0 +1,1181 @@
+# streamlit-analytics2: full documentation
+
+Privacy-first usage analytics for Streamlit apps. This file is every page of docs/ concatenated for retrieval by AI assistants. Source: https://github.com/444B/streamlit-analytics2/tree/main/docs
+
+
+---
+
+<!-- docs/README.md -->
+
+# streamlit-analytics2 documentation
+
+Privacy-first usage analytics for Streamlit apps. These pages are the
+reference for humans and for AI assistants alike: every page states what a
+feature does, the exact code to use it, and what data it produces.
+
+| Page | Read it when you want to |
+|---|---|
+| [Getting started](getting-started.md) | add analytics to an app in two minutes |
+| [API reference](api.md) | know every argument of `track()`, `start_tracking()`, `stop_tracking()`, `event()` |
+| [Dashboard](dashboard.md) | understand each number and chart at `?analytics=on` |
+| [Storage](storage.md) | keep data across restarts: JSON, JSONL, SQLite, your own backend |
+| [Events and data model](events.md) | read the event log with pandas, SQLite or DuckDB |
+| [Custom events](custom-events.md) | count things your app does, not just widgets |
+| [Raw data query](query.md) | run SQL on the dashboard, with examples and the security model |
+| [Privacy](privacy.md) | what is stored, what never is, GDPR notes |
+| [Multipage apps](multipage.md) | per-page numbers with `pages/` or `st.navigation` |
+| [Deployment](deployment.md) | Streamlit Community Cloud, Docker, Cloud Run, secrets |
+| [Firestore](firestore.md) | persist the counters in Firestore, step by step |
+| [FAQ](faq.md) | the dashboard does not show, numbers look wrong, install problems |
+| [Upgrading](upgrading.md) | moving from 0.10 or from the original streamlit-analytics |
+| [For AI agents](for-ai-agents.md) | canonical snippets and decisions when integrating on someone's behalf |
+
+Machine-readable summaries: [`llms.txt`](../llms.txt) (short) and
+[`llms-full.txt`](../llms-full.txt) (all of these pages in one file).
+
+Source: https://github.com/444B/streamlit-analytics2. Package:
+`pip install streamlit-analytics2` or `uv add streamlit-analytics2`.
+
+
+---
+
+<!-- docs/getting-started.md -->
+
+# Getting started
+
+## 1. Install
+
+```
+pip install streamlit-analytics2   # pip
+uv add streamlit-analytics2        # or uv
+```
+
+Python 3.10 or newer, Streamlit 1.47 or newer.
+
+## 2. Wrap your app
+
+```python
+import streamlit as st
+import streamlit_analytics2 as sa2
+
+with sa2.track():
+    st.title("My app")
+    name = st.text_input("Your name")
+    if st.button("Say hello"):
+        st.write(f"Hello {name}")
+```
+
+Everything inside the `with` block is tracked: page loads, reruns, and every
+widget the user changes, wherever it sits (columns, forms, expanders, tabs,
+dialogs, the sidebar). A common pattern is to put the whole app in a function:
+
+```python
+def main():
+    ...
+
+with sa2.track():
+    main()
+```
+
+## 3. Look at the dashboard
+
+Run the app and add `?analytics=on` to the URL:
+
+```
+http://localhost:8501/?analytics=on
+```
+
+A dialog opens with views, visits, visitors, bounce rate, visit time, active
+users, views per page over time, and breakdowns by page, widget, browser,
+device, OS, language, region and campaign. Your own runs with the dashboard
+open are not counted.
+
+## 4. Keep the numbers (optional)
+
+By default everything lives in memory and disappears when the process stops.
+Pick one:
+
+```python
+with sa2.track(save_to_json="analytics.json"):   # counters in JSON, events in analytics.events.jsonl
+    main()
+
+with sa2.track(events_path="analytics.db"):      # events in SQLite; enables the SQL tab
+    main()
+```
+
+See [Storage](storage.md) for the trade-offs and [Deployment](deployment.md)
+for hosts with an ephemeral disk.
+
+## 5. Protect the dashboard (recommended)
+
+```python
+with sa2.track(unsafe_password=st.secrets["analytics_password"]):
+    main()
+```
+
+The password gates the dashboard, the reset button and the SQL tab. It is
+compared in plain text inside the app, so keep it in `st.secrets` or an
+environment variable and do not reuse a real password.
+
+## Next
+
+- [Dashboard](dashboard.md): what each number means.
+- [Custom events](custom-events.md): `sa2.event("report generated")`.
+- [Privacy](privacy.md): what is and is not collected.
+
+
+---
+
+<!-- docs/api.md -->
+
+# API reference
+
+```python
+import streamlit_analytics2 as sa2
+```
+
+## `sa2.track(...)`
+
+Context manager. Calls `start_tracking(...)` on entry and `stop_tracking(...)`
+on exit. Use it around everything you want tracked.
+
+```python
+with sa2.track(
+    unsafe_password=None,
+    save_to_json=None,
+    load_from_json=None,
+    firestore_project_name=None,
+    firestore_collection_name=None,
+    firestore_document_name="counts",
+    firestore_key_file=None,
+    streamlit_secrets_firestore_key=None,
+    session_id=None,
+    verbose=False,
+    *,
+    store_values=False,
+    events_path=None,
+    store=None,
+):
+    ...
+```
+
+| Argument | Type | Default | Meaning |
+|---|---|---|---|
+| `unsafe_password` | `str` | `None` | Password for the dashboard. Also gates the reset button and the SQL tab. Plain-text comparison. |
+| `save_to_json` | path | `None` | Write the legacy counters (`sa2.data`) to this file after every run. Events go to `<stem>.events.jsonl` next to it unless `events_path` or `store` is given. |
+| `load_from_json` | path | `None` | Load the counters from this file once per process at start. |
+| `firestore_key_file` | path | `None` | Service-account JSON for Firestore. Turns Firestore on. |
+| `firestore_collection_name` | `str` | `None` | Firestore collection. |
+| `firestore_document_name` | `str` | `"counts"` | Firestore document for the aggregate counters. |
+| `firestore_project_name` | `str` | `None` | GCP project. Required with `streamlit_secrets_firestore_key`. |
+| `streamlit_secrets_firestore_key` | `str` | `None` | Name of the key in `st.secrets` that holds the service-account JSON as a string. Alternative to `firestore_key_file`. |
+| `session_id` | `str` | `None` | Also persist the current session's counters to Firestore under this document id. |
+| `verbose` | `bool` | `False` | Log loads and saves at INFO through the `streamlit_analytics2` logger. |
+| `store_values` | `bool` | `False` | Record what users type into `text_input`, `text_area` and `chat_input`. Off: recorded as `<text>`. |
+| `events_path` | path | `None` | Where the event log goes. `.jsonl` (default) or `.db` / `.sqlite` / `.sqlite3` for SQLite. |
+| `store` | object | `None` | Your own event backend: anything with `append(events)` and `read() -> list[Event]`. Overrides `events_path`. |
+
+The three keyword-only arguments are new in 0.11. Everything else is
+unchanged since 0.10 and behaves the same.
+
+## `sa2.start_tracking(...)` and `sa2.stop_tracking(...)`
+
+The same arguments as `track()`. Use them when a `with` block is awkward:
+
+```python
+sa2.start_tracking(save_to_json="analytics.json")
+st.button("Click me")
+sa2.stop_tracking(save_to_json="analytics.json")
+```
+
+Arguments given to `start_tracking` are remembered for the matching
+`stop_tracking` in the same run, so you may pass them to either. Call
+`stop_tracking` once per run: it renders the dashboard.
+
+## `sa2.event(name, **props)`
+
+Record a custom event inside a tracked block.
+
+```python
+if st.button("Generate report"):
+    sa2.event("report generated", rows=len(df), format="csv")
+```
+
+`name` is a short string; `props` must be JSON-serialisable. Events show on
+the dashboard under "Events" and in the log with `kind = "custom"`. Called
+outside a tracked run, the event goes to the in-memory store only.
+
+## `sa2.data`
+
+The legacy aggregate counters, a plain dict kept for compatibility with 0.10:
+
+```python
+{
+    "total_pageviews": 12,
+    "total_script_runs": 57,
+    "total_time_seconds": 823.4,
+    "per_day": {"days": ["2026-09-24", "2026-09-25"], "pageviews": [5, 7], "script_runs": [20, 37]},
+    "widgets": {"Click me": 9, "Select your favorite": {"cat": 3, "dog": 5}},
+    "start_time": "25 Sep 2026, 10:00:00",
+    "loaded_from_firestore": False,
+}
+```
+
+Count-only widgets (buttons, checkboxes, toggles, uploads) are integers; the
+rest are `{value: count}` dicts. Widgets are keyed by label here; the event
+log keeps same-label widgets apart.
+
+## `sa2.reset_data()`
+
+Reset `sa2.data` to zero. Does not touch the event log.
+
+## Stores
+
+```python
+from streamlit_analytics2 import JsonlStore, SqliteStore, MemoryStore
+```
+
+Each has `append(events)` and `read()`. `SqliteStore(path).read()` returns
+`Event` objects; see [Events](events.md). Use them to read a log outside the
+app, or pass an instance to `track(store=...)`.
+
+## Logging
+
+The library logs through `logging.getLogger("streamlit_analytics2")` with a
+`NullHandler`. It never configures the root logger. Set the level yourself to
+see loads, saves and capture warnings.
+
+## Streamlit version guard
+
+Widget capture relies on two internal Streamlit hooks. If a future Streamlit
+removes them, the library logs one warning, keeps counting page loads and
+runs, and never breaks your app.
+
+
+---
+
+<!-- docs/dashboard.md -->
+
+# The dashboard
+
+Open your app with `?analytics=on`. A dialog appears; if `unsafe_password` is
+set, enter it first. Runs made while the dashboard is open are not recorded,
+so browsing the analytics does not inflate them.
+
+Two tabs: **Overview** and **Raw data query** (see [query.md](query.md)).
+
+## Filters
+
+- **Range**: Today (hourly buckets), 7 days, 30 days (default), 90 days, All time.
+- **Page**: one page or all. With one page selected, every number and chart is
+  about that page only, and visitor facts cover the visits that saw it.
+
+Times are shown in your browser's timezone.
+
+## Headline numbers
+
+| Number | Definition |
+|---|---|
+| Views | Page loads, including switching to another page within a visit. |
+| Visits | Browser sessions (one Streamlit session each). |
+| Visitors | Distinct people per day, counted from a hash that rotates daily. Two visits by one person on one day count once; on two days, twice. |
+| Bounce rate | Share of visits that loaded one page and never interacted or reran. |
+| Avg visit time | Mean time from first to last activity within a visit, over visits with more than one run. |
+| Active now | Visits with activity in the last 5 minutes. |
+
+## Views over time
+
+A stacked area of views per page (up to seven pages, the rest folded into
+"Other") and, below it on the same time axis, a line of visitors. Hover for
+exact values. "Today" switches both to hourly buckets.
+
+## Breakdowns
+
+Left column: Pages, Browsers, Languages, Sources (`utm_source`), Events.
+Right column: Widgets, Devices, Regions (timezone), Campaigns
+(`utm_campaign`), OS.
+
+Bars show counts with labels; donuts show share with a legend. Browsers, OS
+and devices come from the User-Agent reduced to a family name. Regions come
+from the browser's timezone, which is how the library stands in for country
+without touching IP addresses. Sources and campaigns come from UTM parameters
+on the URL the visitor arrived with, the stand-in for referrers, which
+Streamlit cannot see server-side.
+
+## Traffic load
+
+A weekday-by-hour heatmap of script runs in your timezone, with the busiest
+hour and its number of concurrent visits underneath. This answers "when is
+the app under load".
+
+## Expanders
+
+- **Widget detail**: one row per widget with type, label, key, page, number of
+  changes, number of visits that used it, and the top three values chosen.
+- **Recent visits**: the last 25 visits with start time, duration, page path,
+  runs, interactions, browser, device and timezone.
+- **What is collected**: the privacy summary, see [privacy.md](privacy.md).
+- **Legacy counters**: the 0.10-style numbers from `sa2.data`.
+- **Danger zone** (only with a password): reset the legacy counters. The
+  event log is never deleted from the dashboard.
+
+## When there are no events yet
+
+The Overview shows the legacy counters and a note. Events appear as soon as
+someone uses the app outside the dashboard.
+
+
+---
+
+<!-- docs/storage.md -->
+
+# Storage
+
+Two things can be persisted:
+
+1. **The counters** (`sa2.data`): the 0.10 aggregate, one dict.
+2. **The event log**: one record per session, page view, run, widget change
+   and custom event. The dashboard is built from this.
+
+| You pass | Counters go to | Events go to |
+|---|---|---|
+| nothing | memory | memory (lost on restart) |
+| `save_to_json="a.json"` | `a.json` | `a.events.jsonl` next to it |
+| `events_path="a.jsonl"` | memory (or `save_to_json` if also given) | `a.jsonl` |
+| `events_path="a.db"` | memory (or `save_to_json`) | SQLite file `a.db` |
+| `store=obj` | memory (or `save_to_json`) | `obj.append(...)` |
+| `firestore_*` | Firestore document | as above |
+
+## JSON counters (`save_to_json`, `load_from_json`)
+
+The file has the shape shown in [api.md](api.md#sa2data). It is rewritten
+after every run and read once per process at start. Reading it yourself for
+a visitor counter is fine; do it before entering `track()`.
+
+## JSONL event log (default when persisting)
+
+One JSON object per line, appended. Human-readable, diffable, trivially
+shipped anywhere. Bad lines are skipped with a warning. Fine into the low
+hundreds of thousands of events; the dashboard reads the whole file.
+
+```
+{"ts":"2026-09-25T10:00:00Z","kind":"session","session":"a1b2","visitor":"9f3c","page":"/","props":{"browser":"Chrome","os":"macOS","device":"Desktop","locale":"en-IE","timezone":"Europe/Dublin"}}
+{"ts":"2026-09-25T10:00:00Z","kind":"pageview","session":"a1b2","visitor":"9f3c","page":"/"}
+{"ts":"2026-09-25T10:00:00Z","kind":"run","session":"a1b2","visitor":"9f3c","page":"/"}
+{"ts":"2026-09-25T10:00:12Z","kind":"widget","session":"a1b2","visitor":"9f3c","page":"/","name":"Select your favorite","widget_id":"$$ID-7d0-None","widget_type":"selectbox","value":"dog"}
+```
+
+## SQLite event log (`events_path="x.db"`)
+
+A single `events` table (schema in [events.md](events.md)). Safe for many
+concurrent visitors in one process, fast past millions of rows, and it unlocks
+the **Raw data query** tab. Choose this for anything self-hosted with a disk.
+
+## Your own backend (`store=`)
+
+Any object with two methods:
+
+```python
+class MyStore:
+    def append(self, events):        # iterable of streamlit_analytics2.events.Event
+        ...
+    def read(self):                  # -> list[Event], oldest first
+        ...
+
+with sa2.track(store=MyStore()):
+    main()
+```
+
+`Event.to_dict()` and `Event.from_dict()` convert to and from plain dicts,
+so a Postgres, DuckDB, S3 or HTTP store is a few lines. `read()` is only
+called when the dashboard is opened.
+
+## Firestore (counters only)
+
+The Firestore options persist `sa2.data`, not the event log. They exist for
+compatibility with 0.10 and for hosts without a disk. Setup in
+[firestore.md](firestore.md).
+
+## Where files land
+
+Relative paths resolve against the working directory of `streamlit run`.
+On Streamlit Community Cloud the disk is ephemeral: files survive reruns but
+not a redeploy or restart. See [deployment.md](deployment.md).
+
+
+---
+
+<!-- docs/events.md -->
+
+# Events and data model
+
+Everything the dashboard shows is derived from an append-only list of events.
+The record is small on purpose so you can analyse it with any tool.
+
+## The Event record
+
+| Field | Type | Present on | Meaning |
+|---|---|---|---|
+| `ts` | string | all | ISO 8601 UTC, second precision, e.g. `2026-09-25T10:00:12Z` |
+| `kind` | string | all | `session`, `pageview`, `run`, `widget`, `custom` |
+| `session` | string | all | Streamlit session id, one per browser tab |
+| `visitor` | string | most | 16 hex chars: SHA-256 of `date|ip|user-agent`, truncated. Rotates daily. Absent when neither ip nor user-agent is known. |
+| `page` | string | most | URL path of the page, e.g. `/`, `/reports` |
+| `name` | string | widget, custom | widget label, or the custom event name |
+| `widget_id` | string | widget | Streamlit's element id, stable for the same widget across runs |
+| `widget_type` | string | widget | `button`, `form_submit_button`, `checkbox`, `toggle`, `selectbox`, `radio`, `multiselect`, `slider`, `text_input`, `text_area`, `chat_input`, `number_input`, `date_input`, `time_input`, `color_picker`, `file_uploader`, `camera_input`, ... |
+| `key` | string | widget | the `key=` you gave the widget, if any |
+| `value` | string | widget | the chosen option or value; `<text>` for free text unless `store_values=True`; absent for count-only widgets |
+| `props` | object | session, custom | session: `browser`, `os`, `device`, `locale`, `timezone`, `theme`, `embedded`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term` (only those known). custom: whatever you passed. |
+
+## What each kind means
+
+- **session**: first run of a browser session. Carries the visitor facts.
+- **pageview**: the session landed on a page: on the first run, and whenever
+  the page changes within the session.
+- **run**: every script run, so every rerun after an interaction. Runs with
+  the dashboard open are not recorded.
+- **widget**: a widget's value changed because the user acted. Never on first
+  render. Buttons only when clicked. For a multiselect, one event per newly
+  added option.
+- **custom**: `sa2.event(...)`.
+
+## Reading the log
+
+### pandas
+
+```python
+import pandas as pd
+df = pd.read_json("analytics.events.jsonl", lines=True)
+views_per_day = df[df.kind == "pageview"].groupby(df.ts.str[:10]).size()
+```
+
+### SQLite
+
+```python
+import sqlite3, pandas as pd
+con = sqlite3.connect("analytics.db")
+pd.read_sql("SELECT page, count(*) views FROM events WHERE kind='pageview' GROUP BY page", con)
+```
+
+Table:
+
+```sql
+CREATE TABLE events (
+  id INTEGER PRIMARY KEY, ts TEXT NOT NULL, kind TEXT NOT NULL,
+  session TEXT NOT NULL, visitor TEXT, page TEXT, name TEXT, widget_id TEXT,
+  widget_type TEXT, key TEXT, value TEXT, props TEXT  -- JSON
+);
+CREATE INDEX events_ts ON events(ts);
+```
+
+### DuckDB
+
+```sql
+SELECT page, count(*) AS views
+FROM read_json_auto('analytics.events.jsonl')
+WHERE kind = 'pageview' GROUP BY page ORDER BY views DESC;
+```
+
+### The library itself
+
+```python
+from streamlit_analytics2 import SqliteStore
+from streamlit_analytics2.aggregate import summarize
+events = SqliteStore("analytics.db").read()
+summary = summarize(events)          # the dict the dashboard renders
+summary["pages"], summary["bounce_rate"]
+```
+
+## Derived metrics, exactly
+
+- Views = number of `pageview` events.
+- Visits = distinct `session` values.
+- Visitors = sum over days of distinct `visitor` values that day.
+- Bounce = a visit with at most one `run` and no `widget` or `custom` event.
+- Visit time = last `run` minus first `run` in the visit.
+- Active now = visits with any event in the last 5 minutes.
+
+
+---
+
+<!-- docs/custom-events.md -->
+
+# Custom events
+
+Widgets tell you what people clicked. Custom events tell you what your app
+did for them: a report generated, a model run, a file exported, a search with
+no results.
+
+```python
+import streamlit_analytics2 as sa2
+
+with sa2.track():
+    query = st.text_input("Search")
+    if query:
+        results = search(query)
+        sa2.event("search", results=len(results), empty=len(results) == 0)
+    if st.button("Export CSV"):
+        sa2.event("export", format="csv", rows=len(results))
+```
+
+Rules:
+
+- Call it inside the tracked block (or between `start_tracking` and
+  `stop_tracking`). Outside, the event is kept in memory only.
+- `name` is a short, stable string. Use the same name for the same thing so
+  counts add up. Put variation into `props`.
+- `props` must be JSON-serialisable. Keep them small. Do not put personal data
+  in them; the log is yours to protect.
+- One call, one event. Guard it with the condition that means "it happened",
+  as in the example, so a rerun does not double count.
+
+Where they show up:
+
+- Dashboard, Overview tab, "Events" panel: count and number of visits per name.
+- Event log: `kind = "custom"`, `name`, `props`, with page, session and visitor.
+- SQL tab: `SELECT name, json_extract(props, '$.rows') FROM events WHERE kind='custom'`.
+
+
+---
+
+<!-- docs/query.md -->
+
+# Raw data query
+
+The second tab of the dashboard runs SQL over your event log and shows the
+result as a table or a chart. It exists so you can ask the question the
+dashboard did not think of.
+
+## Requirements
+
+1. The event log must be SQLite: `sa2.track(events_path="analytics.db")`.
+   With the default JSONL log the tab explains this and stops.
+2. The dashboard must have a password: `sa2.track(unsafe_password=...)`.
+   Without one the tab refuses, because anyone who finds `?analytics=on`
+   would otherwise read the raw log.
+
+Why SQLite: the JSONL log is fine to read as a whole, but SQLite lets you ask
+exact questions (one page, one widget, one week), handles many concurrent
+visitors safely, and stays fast past a few hundred thousand events.
+
+## Using it
+
+- Pick an example from the dropdown or write your own `SELECT`.
+- **Run query** shows up to 500 rows and a CSV download.
+- **Present as** turns the result into a Bar, Line, Area, Pie or Scatter
+  chart. Choose the x or category column, the value column, and an optional
+  colour column. Not every result suits every chart; a line needs an ordered x
+  column, a pie needs a few categories and one number.
+
+Schema: `events(id, ts, kind, session, visitor, page, name, widget_id,
+widget_type, key, value, props)`; `props` is JSON on `session` and `custom`
+rows. `ts` is ISO 8601 UTC text, so `substr(ts, 1, 10)` is the day and
+`date('now', '-30 days')` compares correctly.
+
+## Example queries
+
+Views per day, last 30 days:
+
+```sql
+SELECT substr(ts, 1, 10) AS day, count(*) AS views
+FROM events
+WHERE kind = 'pageview' AND ts >= date('now', '-30 days')
+GROUP BY day ORDER BY day
+```
+
+Top pages:
+
+```sql
+SELECT page, count(*) AS views, count(DISTINCT session) AS visits
+FROM events WHERE kind = 'pageview'
+GROUP BY page ORDER BY views DESC
+```
+
+Most used widgets:
+
+```sql
+SELECT widget_type, name, key, count(*) AS changes
+FROM events WHERE kind = 'widget'
+GROUP BY widget_type, name, key ORDER BY changes DESC LIMIT 20
+```
+
+Option popularity for one selectbox:
+
+```sql
+SELECT value, count(*) AS n FROM events
+WHERE kind = 'widget' AND name = 'Select your favorite'
+GROUP BY value ORDER BY n DESC
+```
+
+Visit length:
+
+```sql
+SELECT session, min(ts) AS started,
+       (julianday(max(ts)) - julianday(min(ts))) * 86400 AS seconds,
+       sum(kind = 'widget') AS interactions
+FROM events GROUP BY session ORDER BY started DESC LIMIT 50
+```
+
+Browsers and devices from the session row:
+
+```sql
+SELECT json_extract(props, '$.browser') AS browser,
+       json_extract(props, '$.device') AS device, count(*) AS visits
+FROM events WHERE kind = 'session'
+GROUP BY browser, device ORDER BY visits DESC
+```
+
+Funnel: visits that used widget A and then fired event B:
+
+```sql
+WITH a AS (SELECT session, min(ts) t FROM events WHERE kind='widget' AND name='Generate' GROUP BY session),
+     b AS (SELECT session, min(ts) t FROM events WHERE kind='custom' AND name='report generated' GROUP BY session)
+SELECT count(*) AS started, sum(b.t IS NOT NULL AND b.t >= a.t) AS completed
+FROM a LEFT JOIN b USING (session)
+```
+
+## Security model
+
+Treat the query box as a feature for the app owner, not for visitors.
+
+- The database file is opened **read-only** and the connection is
+  `query_only`.
+- An **authorizer** allows only SELECT, reads and ordinary functions. Writes,
+  schema changes, `PRAGMA`, `ATTACH` and functions that allocate or touch the
+  filesystem (`zeroblob`, `randomblob`, `load_extension`, `readfile`,
+  `writefile`, ...) are refused.
+- One statement per run; comments are stripped by a linear scanner; the text
+  must start with `SELECT` or `WITH`.
+- Limits: 500 rows, a 2 second wall-clock deadline, a 64 MB heap, 10 MB per
+  string, 100 KB of SQL.
+- The tab is behind the dashboard password, which is plain text in your app.
+  Anyone with the password can read the whole log and spend up to 2 seconds
+  of CPU per query. Rotate it if it leaks.
+- With `store_values=True` the log contains typed text: personal data.
+  See [privacy.md](privacy.md).
+
+These are also the reasons the GitHub code-scanning alert on the SQL sink is
+dismissed as intentional.
+
+
+---
+
+<!-- docs/privacy.md -->
+
+# Privacy
+
+The library is built so that the default install collects nothing that
+identifies a person. You can turn some of that off; you cannot turn on IP or
+raw User-Agent storage, because the code never keeps them.
+
+## Stored by default
+
+| Per visit (once, on the `session` event) | Per interaction (`widget` event) |
+|---|---|
+| visitor id: SHA-256 of `today|ip|user-agent`, first 16 hex chars | widget type, label, key, page |
+| browser family (Chrome, Safari, ...), OS family, device family (Desktop, Mobile, Tablet) | the chosen option for selectboxes, radios, sliders, dates, colours, multiselects |
+| language (`locale`), timezone, theme, embedded flag | `<text>` for text inputs, text areas and chat inputs |
+| UTM tags from the URL: source, medium, campaign, content, term | |
+| pages viewed, with timestamps | |
+
+The visitor id changes every day, so the same person on two days is two
+visitors and cannot be followed over time. Two people behind one IP with the
+same browser on the same day are one visitor. That is the trade the library
+makes on purpose; it is the same approach as cookieless analytics tools.
+
+## Never stored
+
+- IP addresses. They enter the hash and are discarded.
+- Raw User-Agent strings. Only the family names survive.
+- Query strings other than the five UTM keys.
+- Typed text, unless you set `store_values=True`.
+- Cookies. None are set or read.
+- File contents or names from uploaders. Only "a file was uploaded".
+
+## `store_values=True`
+
+Records what users type into `text_input`, `text_area` and `chat_input`,
+capped at 200 characters per value. Prompts and names are personal data. If
+you enable this you become responsible for the log under GDPR and similar
+laws: tell users, secure the file, and be ready to delete on request.
+
+## GDPR notes
+
+- Without `store_values`, the log holds pseudonymous usage data: a daily
+  hash, coarse device facts, timezone, language, page paths, widget choices.
+  Under GDPR this is still processing of personal data (the hash is derived
+  from an IP), with a strong legitimate-interest case similar to server logs,
+  and no cross-day profile. Say so in your privacy notice.
+- Timezone and language are shared by millions of people; they are kept
+  because they answer "where are my users" without geolocating anyone.
+- The dashboard and the SQL tab expose the log to whoever knows the
+  password. Use one, and keep it in secrets.
+- Deletion: today you delete rows yourself (`DELETE FROM events WHERE
+  session = ...` on the SQLite file, or filter the JSONL). A deletion API is
+  planned; see issue #148.
+- Retention: the log grows forever. Rotate the file or prune old rows on your
+  own schedule.
+- Firestore: the aggregate counters contain widget labels and chosen values,
+  and `session_id` documents if you use them. Same rules apply.
+
+## What the visitor sees
+
+Nothing. No banner is needed for the default configuration in most
+jurisdictions, because no cookie or client-side identifier is set. That is a
+statement about the library's behaviour, not legal advice for your app.
+
+
+---
+
+<!-- docs/multipage.md -->
+
+# Multipage apps
+
+Call `sa2.track()` on every page. The page path is recorded on each event,
+and the dashboard shows views per page, a page filter, and a per-page path in
+"Recent visits".
+
+## `pages/` directory
+
+```
+app.py
+pages/
+  reports.py
+  settings.py
+```
+
+```python
+# app.py and each file in pages/
+import streamlit as st
+import streamlit_analytics2 as sa2
+
+with sa2.track(events_path="analytics.db"):
+    st.title("Reports")
+    ...
+```
+
+Pass the same storage arguments on every page so they write to the same log.
+
+## `st.Page` and `st.navigation`
+
+```python
+import streamlit as st
+import streamlit_analytics2 as sa2
+
+def home():
+    st.title("Home")
+
+def reports():
+    st.title("Reports")
+
+with sa2.track(events_path="analytics.db"):
+    st.navigation([st.Page(home, url_path="home"), st.Page(reports, url_path="reports")]).run()
+```
+
+Wrapping the `navigation(...).run()` call is enough: the page that runs is
+the one recorded.
+
+## What is per page and what is shared
+
+- Per page: views, visits that saw the page, widget changes, custom events,
+  bounce and visit time when the page filter is set.
+- Shared: the legacy counters in `sa2.data` (`total_pageviews`,
+  `widgets`, ...), which have one global dict as in 0.10. This is a
+  compatibility constraint until 1.0.
+
+## Page names
+
+The recorded `page` is the URL path (`/`, `/reports`). Rename a page and its
+history stays under the old path.
+
+
+---
+
+<!-- docs/deployment.md -->
+
+# Deployment
+
+The only question that matters: does your host keep files between restarts?
+
+| Host | Disk | Recommended |
+|---|---|---|
+| Streamlit Community Cloud | ephemeral (survives reruns, lost on restart or redeploy) | Firestore for counters (see [firestore.md](firestore.md)); or accept that the event log resets; or a custom `store=` that posts elsewhere |
+| Your own server, Docker with a volume, a VM | persistent | `events_path="/data/analytics.db"` and `save_to_json="/data/analytics.json"` |
+| Cloud Run, Fly, Railway, Hugging Face Spaces without a volume | ephemeral | same as Community Cloud, or mount a volume |
+| Snowflake in Streamlit, Databricks apps | usually ephemeral | custom `store=` writing to your warehouse |
+
+## Streamlit Community Cloud
+
+- Add `streamlit-analytics2` to `requirements.txt` or `pyproject.toml`.
+- Put the dashboard password in the app's Secrets and read it with
+  `st.secrets["analytics_password"]`.
+- Community Cloud's own "App viewers" counts unique viewers; this library
+  counts views, visits and daily visitors. They will not match, and both are
+  right.
+
+## Docker
+
+```yaml
+services:
+  app:
+    image: my-streamlit-app
+    volumes:
+      - analytics:/data
+    environment:
+      - ANALYTICS_PASSWORD=...
+volumes:
+  analytics:
+```
+
+```python
+with sa2.track(events_path="/data/analytics.db", unsafe_password=os.environ["ANALYTICS_PASSWORD"]):
+    main()
+```
+
+## Secrets and passwords
+
+- `unsafe_password` is compared in plain text inside the app. Use a dedicated
+  value, store it in `st.secrets` or an environment variable, rotate it if it
+  leaks. It gates the dashboard, the reset button and the SQL tab.
+- Firestore credentials: never commit the key file. Use
+  `streamlit_secrets_firestore_key` with the JSON in `st.secrets`, or an
+  environment variable written to a file at start.
+
+## Reverse proxies and embedding
+
+The library reads the request headers Streamlit exposes. Behind a proxy,
+`st.context.ip_address` is what the proxy forwards; the visitor hash is
+derived from it and never stored. Embedded apps (`?embed=true`) record
+`embedded: true` on the session.
+
+## Multiple replicas
+
+Each replica has its own memory. With a shared volume, SQLite handles
+concurrent writers within one process; across processes on the same file
+it also works, with SQLite's usual locking. For many replicas, use a custom
+`store=` against a database.
+
+## Resource use
+
+Per run: one lookup per rendered widget and one append. The dashboard reads
+the whole log when opened; at 100k events that is well under a second with
+SQLite. The SQL tab caps each query at 2 seconds and 64 MB.
+
+
+---
+
+<!-- docs/firestore.md -->
+
+# Firestore
+
+Persists the aggregate counters (`sa2.data`) in a Firestore document, and
+optionally the current session's counters under `session_id`. The event log
+is not sent to Firestore; use `store=` for that.
+
+Requires `google-cloud-firestore`. It is installed by default in 0.11; from
+1.0 you will need `pip install "streamlit-analytics2[firestore]"`. Install
+the extra now to be ready.
+
+## Set up a project
+
+1. Open https://console.firebase.google.com and create a project (or pick an
+   existing GCP project).
+2. Project settings (cog, top left) > Usage and billing. It should say
+   **Spark** (free). Anything else can cost money.
+3. Build > Firestore Database > Create database. Only the `(default)`
+   database is on the free tier. Choose a region near your users, or a
+   multi-region like `eur3` or `nam5`. Start in **production mode**.
+4. Start a collection, e.g. `streamlit_analytics2`. Add any document; the
+   library creates its own.
+5. Project settings > Service accounts > Python > **Generate new private
+   key**. Save the JSON. Do not commit it.
+
+## Option A: key file on disk
+
+```python
+with sa2.track(
+    firestore_key_file="firestore-key.json",
+    firestore_collection_name="streamlit_analytics2",
+    firestore_document_name="counts",        # default
+):
+    main()
+```
+
+## Option B: key in `st.secrets` (Streamlit Community Cloud, no file in the repo)
+
+Put the JSON into `.streamlit/secrets.toml` (locally) or the app's Secrets
+(on Community Cloud) as one string under a key of your choice, here
+`firebase`:
+
+```toml
+firebase = '{"type": "service_account", "project_id": "my-project", ...}'
+project_name = "my-project"
+```
+
+Then:
+
+```python
+with sa2.track(
+    streamlit_secrets_firestore_key="firebase",        # the key NAME in st.secrets
+    firestore_project_name=st.secrets["project_name"],
+    firestore_collection_name="streamlit_analytics2",
+):
+    main()
+```
+
+`streamlit_secrets_firestore_key` is the name of the secret, not a file
+path. Both `streamlit_secrets_firestore_key` and `firestore_project_name` must
+be given for this mode.
+
+## Option C: environment variable (Cloud Run and similar)
+
+Write the JSON from the environment to a temporary file at start and use
+option A, or load it into `st.secrets` before `track()`.
+
+## Per-session counters
+
+`session_id="..."` also stores the current session's counters in a document
+of that name in the same collection. Choose ids that cannot collide with
+`firestore_document_name`.
+
+## Behaviour
+
+- Loaded once per process at start, saved after every run with `merge=True`,
+  so extra fields you add to the document survive.
+- Keys are sanitised: empty keys are dropped, others become strings.
+- The dashboard's reset also overwrites the Firestore document on the next
+  save.
+
+## Troubleshooting
+
+- `Firestore support needs the extra`: install
+  `streamlit-analytics2[firestore]`.
+- `One or more components is not a string or is empty`: a widget label or
+  value was empty; 0.11 sanitises these, upgrade.
+- Permission errors: the service account needs the Cloud Datastore User role.
+
+
+---
+
+<!-- docs/faq.md -->
+
+# FAQ and troubleshooting
+
+**The dashboard does not appear.**
+The query parameter must be exactly `analytics=on`. `?analytics=true` does
+nothing. The dashboard renders where `stop_tracking()` runs, so the tracked
+block must reach its end without an exception.
+
+**`ModuleNotFoundError: No module named 'streamlit_analytics2'` with uv.**
+`uvx streamlit run app.py` runs Streamlit in an isolated tool environment
+that does not contain your project's dependencies. Use `uv run streamlit run
+app.py` (or `uv add streamlit-analytics2` and activate the venv).
+
+**The numbers are lower than on 0.10.**
+By design. A widget rendering with its default value no longer counts as an
+interaction; only changes the user made are counted. See
+[upgrading.md](upgrading.md).
+
+**Views are higher than Streamlit Community Cloud's viewers.**
+Views count page loads and page switches; Community Cloud counts unique
+viewers. Compare Visitors instead, and expect a small difference from the
+daily rotation of the visitor id.
+
+**Two buttons with the same label are counted together.**
+In `sa2.data` (legacy), yes. In the event log and on the dashboard they are
+separate as long as they have different `key=` values or sit in different
+places.
+
+**A widget inside a form only counts on submit.**
+Correct: Streamlit delivers form values when the form is submitted, so that
+is when the change is recorded.
+
+**Clicks are lost when the page raises an exception.**
+The run never reaches `stop_tracking()`, so nothing is written for that run.
+Fix the exception; the next successful run records normally.
+
+**`st.selectbox(..., index=None)` crashed on 0.10.**
+Fixed in 0.11: no crash, and nothing counted until a value is chosen.
+
+**Is it heavy?**
+No. One hook per process, one dictionary lookup per rendered widget per run,
+one append per run. The 0.10 approach of patching thirty functions on every
+run is gone.
+
+**Where is the config screen?**
+Removed in 0.11. It wrote a file nothing read. Configure with `track()`
+arguments.
+
+**How do I reset?**
+`sa2.reset_data()` from code, or the Danger zone on the dashboard (needs a
+password). Both reset the counters only. Delete or prune the event log file
+to reset events.
+
+**The logger prints into my app's logs.**
+Since 0.11 the library uses `logging.getLogger("streamlit_analytics2")` with
+a `NullHandler` and never configures the root logger. Set its level to
+`WARNING` to silence it entirely.
+
+**Does it work with `st.fragment`?**
+Partly. A fragment rerun executes only the fragment, so `track()` does not
+run and changes made during fragment-only reruns are not captured. Widgets
+outside fragments, page loads and full reruns are recorded as usual. Full
+fragment support is on the list for a later release.
+
+**Can I send data to Google Analytics, PostHog or Plausible?**
+Not from this library: Streamlit cannot inject client-side scripts. Use a
+custom `store=` to forward events server-side, or read the log with your own
+job.
+
+**I upgraded Streamlit and widget counts stopped, with a warning in the log.**
+The capture hook checks for two Streamlit internals. If a Streamlit release
+changes them, the library logs one warning and keeps counting page loads and
+runs. Open an issue with the Streamlit version; the fix is usually small.
+
+
+---
+
+<!-- docs/upgrading.md -->
+
+# Upgrading
+
+## From 0.10 to 0.11
+
+Nothing to change in code. Every function, argument, the `sa2.data` shape and
+the `save_to_json` file shape are unchanged.
+
+What you will notice:
+
+- **Lower counts.** A widget rendering with its default is no longer an
+  interaction. 0.10 added +1 to every checkbox, selectbox, slider and text
+  input on every new session; 0.11 counts only what users change.
+- **`<text>` instead of typed text.** Pass `store_values=True` to keep the
+  0.10 behaviour of storing what users type.
+- **Reset needs a password.** The reset button on the dashboard only shows
+  when `unsafe_password` is set.
+- **No Config tab.** It wrote `.streamlit/analytics.toml`, which nothing read.
+- **Streamlit 1.47 or newer.**
+- **A new file appears** next to `save_to_json`: `<name>.events.jsonl`, the
+  event log. It is safe to delete at any time; only the dashboard reads it.
+
+## From the original `streamlit-analytics`
+
+```
+pip uninstall streamlit-analytics
+pip install streamlit-analytics2
+```
+
+```python
+import streamlit_analytics2 as streamlit_analytics   # keep the old alias if you like
+```
+
+The `track`, `start_tracking` and `stop_tracking` calls are the same. The
+deprecation warnings about `experimental_get_query_params` and
+`experimental_dialog` go away.
+
+## Towards 1.0
+
+Planned breaking changes, announced here first:
+
+- `google-cloud-firestore` becomes an optional extra: `pip install
+  "streamlit-analytics2[firestore]"`.
+- `sa2.data["widgets"]` keys by `key=` when present, then label, so
+  same-label widgets stop merging.
+- `unsafe_password` gets a hashed alternative.
+- A deletion API for sessions and visitors.
+
+
+---
+
+<!-- docs/for-ai-agents.md -->
+
+# For AI agents integrating this library
+
+Read this page when a user asks you to "add analytics to my Streamlit app".
+It gives the decisions and the exact code so you do not have to guess.
+
+## Decisions to make, in order
+
+1. **Where does the app run?** If the disk persists (own server, Docker
+   volume, VM): use `events_path="analytics.db"`. If it is ephemeral
+   (Streamlit Community Cloud, Cloud Run without a volume): use
+   `save_to_json` plus Firestore for the counters, or accept resets, or a
+   custom `store=`.
+2. **Who may see the dashboard?** Always set `unsafe_password` from
+   `st.secrets` or an environment variable. Never hard-code it.
+3. **Is typed text needed?** Default no. Only set `store_values=True` if the
+   user explicitly wants prompts or inputs recorded, and tell them it is
+   personal data.
+4. **Multipage?** Put the same `track(...)` call, with the same storage
+   arguments, on every page, or around `st.navigation(...).run()`.
+
+## Canonical snippet
+
+```python
+import os
+import streamlit as st
+import streamlit_analytics2 as sa2
+
+
+def main() -> None:
+    st.title("My app")
+    ...
+
+
+with sa2.track(
+    events_path="analytics.db",                       # SQLite event log, enables SQL tab
+    save_to_json="analytics.json",                    # legacy counters, optional
+    unsafe_password=os.environ.get("ANALYTICS_PASSWORD"),
+):
+    main()
+```
+
+Tell the user: open `<app url>/?analytics=on` and enter the password.
+
+## Recording something the app does
+
+```python
+sa2.event("report generated", rows=len(df))
+```
+
+Inside the tracked block, guarded by the condition that means it happened.
+
+## Reading the data programmatically
+
+```python
+from streamlit_analytics2 import SqliteStore
+from streamlit_analytics2.aggregate import summarize
+events = SqliteStore("analytics.db").read()      # list of Event dataclasses
+summary = summarize(events)                        # views, visits, visitors, pages, widgets, ...
+```
+
+Or SQL: table `events(ts, kind, session, visitor, page, name, widget_id,
+widget_type, key, value, props)`. Examples in [query.md](query.md).
+
+## Things not to do
+
+- Do not wrap `st.set_page_config()` inside the block; call it first.
+- Do not call `stop_tracking()` twice in one run.
+- Do not read the JSON counters inside the block on the first run before the
+  file exists; read them before `track()` with a default.
+- Do not promise country or referrer data; the library provides timezone and
+  UTM tags instead, on purpose.
+- Do not run `examples/dev/seed.py` against a real log; it writes fake
+  traffic.
+
+## Answering common questions
+
+- "Is it GDPR compliant?" Default configuration stores a daily-rotating hash
+  and coarse device facts, no IP, no cookies, no typed text. See
+  [privacy.md](privacy.md). Compliance depends on the app's notice and
+  handling; the library gives a strong starting point.
+- "Why did my counts drop after upgrading?" See [upgrading.md](upgrading.md):
+  first render no longer counts.
+- "Can I use my own database?" Yes: `store=` with `append` and `read`.
+
+## Versions
+
+Check `streamlit_analytics2.__version__`. This page describes 0.11. The
+`llms-full.txt` at the repository root contains all documentation in one
+file for retrieval.

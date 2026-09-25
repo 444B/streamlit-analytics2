@@ -14,7 +14,8 @@ and SQL over your own data. No JavaScript, no cookies, no IP addresses stored.
 
 1. Install:
    ```
-   pip install streamlit-analytics2
+   pip install streamlit-analytics2   # pip
+   uv add streamlit-analytics2        # or uv
    ```
 2. Wrap your app:
    ```python
@@ -129,6 +130,29 @@ rendering with its default no longer counts as an interaction, typed text is
 no longer stored unless you ask, and the dashboard reset now needs a
 password. Details in
 [CHANGELOG.md](https://github.com/444B/streamlit-analytics2/blob/main/CHANGELOG.md).
+
+## Documentation
+
+Full docs live in [`docs/`](https://github.com/444B/streamlit-analytics2/tree/main/docs)
+and on the [wiki](https://github.com/444B/streamlit-analytics2/wiki):
+[getting started](https://github.com/444B/streamlit-analytics2/blob/main/docs/getting-started.md),
+[API reference](https://github.com/444B/streamlit-analytics2/blob/main/docs/api.md),
+[dashboard](https://github.com/444B/streamlit-analytics2/blob/main/docs/dashboard.md),
+[storage](https://github.com/444B/streamlit-analytics2/blob/main/docs/storage.md),
+[events and data model](https://github.com/444B/streamlit-analytics2/blob/main/docs/events.md),
+[raw data query](https://github.com/444B/streamlit-analytics2/blob/main/docs/query.md),
+[privacy](https://github.com/444B/streamlit-analytics2/blob/main/docs/privacy.md),
+[multipage](https://github.com/444B/streamlit-analytics2/blob/main/docs/multipage.md),
+[deployment](https://github.com/444B/streamlit-analytics2/blob/main/docs/deployment.md),
+[Firestore](https://github.com/444B/streamlit-analytics2/blob/main/docs/firestore.md),
+[FAQ](https://github.com/444B/streamlit-analytics2/blob/main/docs/faq.md),
+[upgrading](https://github.com/444B/streamlit-analytics2/blob/main/docs/upgrading.md).
+
+For AI assistants: [`llms.txt`](https://github.com/444B/streamlit-analytics2/blob/main/llms.txt)
+is the short summary, [`llms-full.txt`](https://raw.githubusercontent.com/444B/streamlit-analytics2/main/llms-full.txt)
+is every docs page in one file, and
+[docs/for-ai-agents.md](https://github.com/444B/streamlit-analytics2/blob/main/docs/for-ai-agents.md)
+has the integration decisions and canonical snippets.
 
 ## Contributing
 

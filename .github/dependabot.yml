@@ -1,38 +1,23 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directory: "/"
     schedule:
       interval: "weekly"
-    # Add these recommended settings
-    allow:
-      # Only handle production dependencies by default
-      - dependency-type: "production"
+      day: "monday"
     commit-message:
       prefix: "deps"
-      include: "scope"
-    # Group updates together
     groups:
-      dev-dependencies:
-        patterns:
-          - "black"
-          - "isort"
-          - "flake8"
-          - "mypy"
-          - "bandit"
-          - "pytest*"
-      production-dependencies:
-        patterns:
-          - "streamlit"
-          - "pandas"
-          - "altair"
-          - "google-cloud-firestore"
-    # Specify target branch
-    target-branch: "main"
-    # Set reviewers for the PRs
-    reviewers:
-      - "444B"
-    # Labels for PRs
-    labels:
-      - "dependencies"
-      - "automated"
+      runtime:
+        patterns: ["streamlit", "pandas", "altair", "google-cloud-firestore"]
+      tooling:
+        patterns: ["black", "isort", "flake8", "mypy", "bandit", "pytest*", "pandas-stubs", "build", "twine"]
+    labels: ["dependencies"]
+    open-pull-requests-limit: 5
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies"]

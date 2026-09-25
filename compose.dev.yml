@@ -1,7 +1,8 @@
-# Local dev stack on Exodia. Reachable on the tailnet only:
-#   http://100.103.177.102:8227        the demo app
-#   http://100.103.177.102:8227/?analytics=on   the dashboard
+# Local dev stack: the dev app on a port of your choice, reloading on save.
+# Put SA2_DEV_BIND (address to publish on), SA2_DEV_PORT and
+# SA2_DASHBOARD_PASSWORD in a .env file next to this file (gitignored).
 # Up: docker compose -f compose.dev.yml up -d --build
+# Then open http://<bind>:<port>/?analytics=on
 services:
   sa2-dev:
     build:
@@ -10,10 +11,10 @@ services:
     container_name: sa2-dev
     restart: unless-stopped
     ports:
-      - "100.103.177.102:8227:8501"
+      - "${SA2_DEV_BIND:-127.0.0.1}:${SA2_DEV_PORT:-8227}:8501"
     volumes:
       - .:/app
       - /mnt/user/appdata/sa2-dev/data:/data
     environment:
       - SA2_DATA_DIR=/data
-      - SA2_DASHBOARD_PASSWORD=sa2dev
+      - SA2_DASHBOARD_PASSWORD=${SA2_DASHBOARD_PASSWORD:-change-me}

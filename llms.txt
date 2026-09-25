@@ -54,6 +54,23 @@ language, timezone, theme, UTM tags, pages, widget type/label/key/chosen
 option. Not stored: IP, raw User-Agent, query strings, typed text (unless
 `store_values=True`).
 
+## Docs
+
+- Full documentation in one file: https://raw.githubusercontent.com/444B/streamlit-analytics2/main/llms-full.txt
+- Integration guide for agents: https://github.com/444B/streamlit-analytics2/blob/main/docs/for-ai-agents.md
+- Getting started: https://github.com/444B/streamlit-analytics2/blob/main/docs/getting-started.md
+- API reference: https://github.com/444B/streamlit-analytics2/blob/main/docs/api.md
+- Dashboard: https://github.com/444B/streamlit-analytics2/blob/main/docs/dashboard.md
+- Storage: https://github.com/444B/streamlit-analytics2/blob/main/docs/storage.md
+- Events and data model: https://github.com/444B/streamlit-analytics2/blob/main/docs/events.md
+- Raw data query (SQL): https://github.com/444B/streamlit-analytics2/blob/main/docs/query.md
+- Privacy: https://github.com/444B/streamlit-analytics2/blob/main/docs/privacy.md
+- Multipage apps: https://github.com/444B/streamlit-analytics2/blob/main/docs/multipage.md
+- Deployment: https://github.com/444B/streamlit-analytics2/blob/main/docs/deployment.md
+- Firestore: https://github.com/444B/streamlit-analytics2/blob/main/docs/firestore.md
+- FAQ: https://github.com/444B/streamlit-analytics2/blob/main/docs/faq.md
+- Upgrading: https://github.com/444B/streamlit-analytics2/blob/main/docs/upgrading.md
+
 ## Links
 
 - README: https://github.com/444B/streamlit-analytics2#readme
