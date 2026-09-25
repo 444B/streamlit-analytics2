@@ -95,10 +95,9 @@ def summarize(
     for e in events:
         ts = e.parsed_ts()
         local = ts + shift
-        if e.kind in (ev.RUN, ev.SESSION):
-            runs[e.session].append(ts)
-            last_seen[e.session] = max(ts, last_seen.get(e.session, ts))
+        last_seen[e.session] = max(ts, last_seen.get(e.session, ts))
         if e.kind == ev.RUN:
+            runs[e.session].append(ts)
             load[(local.weekday(), local.hour)] += 1
             sessions_by_hour[local.strftime("%Y-%m-%d %H")].add(e.session)
         if e.visitor:
