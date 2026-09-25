@@ -83,12 +83,39 @@ def test_writes_and_escapes_are_refused(db):
 def test_row_cap_and_step_budget(db):
     cols, rows = run_query(db, "SELECT * FROM events", limit=2)
     assert len(rows) == 2
-    with pytest.raises(QueryError, match="too much work"):
+    with pytest.raises(QueryError, match="ran longer"):
         run_query(
             db,
             "WITH RECURSIVE c(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM c) SELECT count(*) FROM c",
-            step_budget=10,
+            timeout_seconds=0.2,
         )
+
+
+def test_dangerous_functions_and_comments(db):
+    from streamlit_analytics2.query import strip_comments
+
+    for bad in [
+        "SELECT zeroblob(1000000000)",
+        "SELECT load_extension('x')",
+        "SELECT randomblob(10)",
+    ]:
+        with pytest.raises(QueryError):
+            run_query(db, bad)
+    assert (
+        strip_comments("SELECT 1 -- x\n/* y */ FROM events")
+        == "SELECT 1 \n  FROM events"
+    )
+    assert (
+        strip_comments("SELECT '--not a comment' FROM events")
+        == "SELECT '--not a comment' FROM events"
+    )
+    assert strip_comments("SELECT /* unterminated") == "SELECT  "
+    cols, rows = run_query(db, "/* leading */ SELECT count(*) FROM events -- trailing")
+    assert rows == [(5,)]
+    with pytest.raises(QueryError):
+        run_query(db, "SELECTION 1")
+    with pytest.raises(QueryError):
+        run_query(db, "WITHDRAW 1")
 
 
 def test_missing_db(tmp_path):

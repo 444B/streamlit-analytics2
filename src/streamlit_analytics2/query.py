@@ -9,19 +9,35 @@ queries, and rows are capped.
 
 from __future__ import annotations
 
-import re
 import sqlite3
+import time
 from pathlib import Path
-from typing import Any, List, Sequence, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 MAX_ROWS = 500
+TIMEOUT_SECONDS = 2.0
+HEAP_LIMIT_BYTES = 64 * 1024 * 1024
 _ALLOWED = {
     sqlite3.SQLITE_SELECT,
     sqlite3.SQLITE_READ,
     sqlite3.SQLITE_FUNCTION,
     getattr(sqlite3, "SQLITE_RECURSIVE", 33),
 }
-_COMMENT = re.compile(r"(--[^\n]*|/\*.*?\*/)", re.S)
+# SQL functions that allocate at will, touch the filesystem or load code.
+_DENIED_FUNCTIONS = frozenset(
+    {
+        "zeroblob",
+        "randomblob",
+        "load_extension",
+        "readfile",
+        "writefile",
+        "edit",
+        "fsdir",
+        "sqlar_compress",
+        "sqlar_uncompress",
+        "eval",
+    }
+)
 
 EXAMPLES = [
     (
@@ -86,23 +102,71 @@ class QueryError(ValueError):
     pass
 
 
-def _authorizer(action: int, *_: Any) -> int:
-    return sqlite3.SQLITE_OK if action in _ALLOWED else sqlite3.SQLITE_DENY
+def _authorizer(action: int, arg1: Any, arg2: Any, *_: Any) -> int:
+    if action not in _ALLOWED:
+        return sqlite3.SQLITE_DENY
+    if action == sqlite3.SQLITE_FUNCTION:
+        name = (arg2 or arg1 or "").lower()
+        if name in _DENIED_FUNCTIONS:
+            return sqlite3.SQLITE_DENY
+    return sqlite3.SQLITE_OK
+
+
+def strip_comments(sql: str) -> str:
+    """Remove -- and /* */ comments in one linear pass, respecting quotes."""
+    out: List[str] = []
+    i, n, quote = 0, len(sql), None
+    while i < n:
+        c = sql[i]
+        if quote:
+            out.append(c)
+            if c == quote:
+                quote = None
+            i += 1
+        elif c in ("'", '"', "`"):
+            quote = c
+            out.append(c)
+            i += 1
+        elif c == "-" and sql.startswith("--", i):
+            j = sql.find("\n", i)
+            i = n if j < 0 else j
+        elif c == "/" and sql.startswith("/*", i):
+            j = sql.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            out.append(" ")
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def _is_select(text: str) -> bool:
+    head = text[:6].lower()
+    return head == "select" or (
+        head[:4] == "with" and (len(text) == 4 or not text[4].isalnum())
+    )
 
 
 def run_query(
     path: Union[str, Path],
     sql: str,
     limit: int = MAX_ROWS,
-    step_budget: int = 2_000_000,
+    timeout_seconds: Optional[float] = TIMEOUT_SECONDS,
 ) -> Tuple[List[str], List[Sequence[Any]]]:
-    """Run one read-only SELECT and return (columns, rows)."""
-    text = _COMMENT.sub("", sql).strip().rstrip(";").strip()
+    """Run one read-only SELECT from an untrusted string; return (columns, rows).
+
+    The string is executed on purpose: this is the dashboard's query box.
+    Safety comes from the connection, not from parsing the text: read-only
+    file, ``query_only``, an authorizer that allows SELECT and reads only
+    (no ATTACH, PRAGMA, writes, schema, extension loading or blob allocation
+    functions), a heap limit, a wall-clock deadline and a row cap.
+    """
+    text = strip_comments(sql).strip().rstrip(";").strip()
     if not text:
         raise QueryError("Empty query.")
     if ";" in text:
         raise QueryError("One statement at a time.")
-    if not re.match(r"(?is)^(select|with)\b", text):
+    if not _is_select(text):
         raise QueryError("Only SELECT (or WITH ... SELECT) queries are allowed.")
     if not Path(path).exists():
         raise QueryError(f"No database at {path}.")
@@ -110,14 +174,19 @@ def run_query(
     conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
     try:
         conn.execute("PRAGMA query_only = 1")
+        for pragma in ("hard_heap_limit", "soft_heap_limit"):
+            try:
+                conn.execute(f"PRAGMA {pragma} = {HEAP_LIMIT_BYTES}")
+            except sqlite3.DatabaseError:  # older SQLite without the pragma
+                pass
         conn.set_authorizer(_authorizer)
-        steps = {"n": 0}
+        if timeout_seconds is not None:
+            deadline = time.monotonic() + timeout_seconds
 
-        def _budget() -> int:
-            steps["n"] += 1
-            return 1 if steps["n"] > step_budget else 0
+            def _check_deadline() -> int:
+                return 1 if time.monotonic() > deadline else 0
 
-        conn.set_progress_handler(_budget, 1000)
+            conn.set_progress_handler(_check_deadline, 1000)
         try:
             cur = conn.execute(text)
             rows = cur.fetchmany(limit)
@@ -127,7 +196,8 @@ def run_query(
                 raise QueryError("That statement is not allowed here.") from exc
             if "interrupted" in msg:
                 raise QueryError(
-                    "Query aborted: too much work. Add a WHERE or LIMIT."
+                    "Query aborted: it ran longer than "
+                    f"{timeout_seconds}s. Add a WHERE or LIMIT."
                 ) from exc
             raise QueryError(msg) from exc
         columns = [d[0] for d in cur.description] if cur.description else []
