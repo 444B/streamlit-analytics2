@@ -294,10 +294,15 @@ def _views_chart(
         )
         .encode(
             x=x,
-            y=alt.Y("visitors:Q", title="visitors", axis=alt.Axis(tickMinStep=1)),
+            y=alt.Y(
+                "visitors:Q",
+                title="visitors",
+                scale=alt.Scale(nice=True, zero=True),
+                axis=alt.Axis(tickMinStep=1, tickCount=4),
+            ),
             tooltip=[alt.Tooltip("when:T", format=tip_fmt), "visitors:Q", "views:Q"],
         )
-        .properties(height=110)
+        .properties(height=140)
     )
     st.altair_chart(
         alt.vconcat(area, line, spacing=4).resolve_scale(x="shared"), width="stretch"
@@ -406,18 +411,119 @@ def _raw_query(store: Any, unsafe_password: Optional[str]) -> None:
             cols, rows = query.run_query(store.path, sql)
         except query.QueryError as exc:
             st.error(str(exc))
+            st.session_state.pop("_sa2_q_result", None)
             return
-        if not rows:
-            st.caption("No rows.")
-            return
-        df = pd.DataFrame(rows, columns=cols)
-        st.dataframe(df, hide_index=True)
-        st.caption(
-            f"{len(df)} rows" + (" (capped)" if len(df) >= query.MAX_ROWS else "")
+        st.session_state["_sa2_q_result"] = pd.DataFrame(rows, columns=cols)
+    df = st.session_state.get("_sa2_q_result")
+    if df is None:
+        return
+    if df.empty:
+        st.caption("No rows.")
+        return
+    st.dataframe(df, hide_index=True)
+    st.caption(f"{len(df)} rows" + (" (capped)" if len(df) >= query.MAX_ROWS else ""))
+    st.download_button("Download CSV", df.to_csv(index=False), "query.csv", "text/csv")
+    _present(df, _theme())
+
+
+def _present(df: pd.DataFrame, pal: Dict[str, Any]) -> None:
+    """Let the user pick a chart for the query result."""
+    st.markdown("**Present as**")
+    st.caption(
+        "Not every result makes sense in every chart: a line needs an ordered "
+        "x column, a pie needs a few categories and one number. You choose."
+    )
+    numeric = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    others = [c for c in df.columns if c not in numeric]
+    kind = st.segmented_control(
+        "Chart",
+        ["Table", "Bar", "Line", "Area", "Pie", "Scatter"],
+        default="Table",
+        key="_sa2_q_kind",
+    )
+    if kind in (None, "Table"):
+        return
+    if not numeric:
+        st.info("This result has no numeric column to plot.")
+        return
+    c1, c2, c3 = st.columns(3)
+    x_options = list(df.columns) if kind == "Scatter" else (others or list(df.columns))
+    x = c1.selectbox("x / category", x_options, key="_sa2_q_x")
+    y = c2.selectbox("y / value", numeric, key="_sa2_q_y")
+    colour = c3.selectbox(
+        "colour by", ["none"] + [c for c in others if c != x], key="_sa2_q_c"
+    )
+    d = df.copy()
+    if kind in ("Line", "Area") and not pd.api.types.is_numeric_dtype(d[x]):
+        parsed = pd.to_datetime(d[x], errors="coerce")
+        if parsed.notna().mean() > 0.8:
+            d[x] = parsed
+    if pd.api.types.is_datetime64_any_dtype(d[x]):
+        x_type = "T"
+    elif pd.api.types.is_numeric_dtype(d[x]):
+        x_type = "Q"
+    else:
+        x_type = "N"
+    x_enc = alt.X(f"{x}:{x_type}", title=x)
+    y_enc = alt.Y(f"{y}:Q", title=y)
+    colour_enc: Any = alt.value(pal["series"][0])
+    if colour != "none":
+        col = d[colour].astype(str)
+        cats = list(col.unique())[:8]
+        d[colour] = col.where(col.isin(cats), "Other")
+        domain = cats + (["Other"] if (d[colour] == "Other").any() else [])
+        colour_enc = alt.Color(
+            f"{colour}:N",
+            scale=alt.Scale(domain=domain, range=pal["series"][: len(domain)]),
         )
-        st.download_button(
-            "Download CSV", df.to_csv(index=False), "query.csv", "text/csv"
+    tips = list(d.columns)
+    base = alt.Chart(d)
+    if kind == "Bar":
+        chart = base.mark_bar(cornerRadiusEnd=4).encode(
+            y=alt.Y(f"{x}:N", sort="-x", title=x),
+            x=y_enc,
+            color=colour_enc,
+            tooltip=tips,
         )
+    elif kind == "Line":
+        chart = base.mark_line(point=True, interpolate="monotone").encode(
+            x=x_enc, y=y_enc, color=colour_enc, tooltip=tips
+        )
+    elif kind == "Area":
+        chart = base.mark_area(interpolate="monotone", opacity=0.8).encode(
+            x=x_enc,
+            y=alt.Y(f"{y}:Q", stack="zero", title=y),
+            color=colour_enc,
+            tooltip=tips,
+        )
+    elif kind == "Pie":
+        d[x] = d[x].astype(str)
+        top = d.groupby(x, as_index=False)[y].sum().sort_values(by=y, ascending=False)
+        if len(top) > 7:
+            rest = top.iloc[7:][y].sum()
+            top = pd.concat([top.iloc[:7], pd.DataFrame({x: ["Other"], y: [rest]})])
+        order = list(top[x])
+        chart = (
+            alt.Chart(top)
+            .mark_arc(innerRadius=50, padAngle=0.02, cornerRadius=3)
+            .encode(
+                theta=alt.Theta(f"{y}:Q"),
+                color=alt.Color(
+                    f"{x}:N",
+                    sort=order,
+                    scale=alt.Scale(domain=order, range=pal["series"][: len(order)]),
+                ),
+                tooltip=[x, y],
+            )
+        )
+    else:  # Scatter
+        chart = base.mark_circle(size=60, opacity=0.8).encode(
+            x=alt.X(f"{x}:{'Q' if x_type == 'Q' else 'N'}", title=x),
+            y=y_enc,
+            color=colour_enc,
+            tooltip=tips,
+        )
+    st.altair_chart(chart.properties(height=320), width="stretch")
 
 
 def _viewer_offset() -> int:

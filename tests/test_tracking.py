@@ -246,3 +246,23 @@ def test_dashboard_renders_with_events_and_range_switch():
     at.session_state["_sa2_range"] = "All time"
     at.run()
     assert not at.exception, at.exception
+
+
+def test_query_tab_present_as(tmp_path):
+    db = tmp_path / "e.db"
+    at = _app(events_path=str(db), unsafe_password="pw")
+    at.selectbox[0].select("dog").run()
+    at.query_params["analytics"] = "on"
+    at.run()
+    [t for t in at.text_input if t.label == "Password"][0].set_value("pw").run()
+    assert not at.exception, at.exception
+    sql = [t for t in at.text_area if t.label == "SQL"][0]
+    sql.set_value("SELECT kind, count(*) AS n FROM events GROUP BY kind").run()
+    [b for b in at.button if b.label == "Run query"][0].click().run()
+    assert not at.exception, at.exception
+    assert any("Present as" in m.value for m in at.markdown)
+    assert "_sa2_q_kind" in at.session_state
+    for kind in ("Bar", "Pie", "Line", "Area", "Scatter"):
+        at.session_state["_sa2_q_kind"] = kind
+        at.run()
+        assert not at.exception, (kind, at.exception)
