@@ -184,8 +184,11 @@ def run_query(
             ("SQLITE_LIMIT_SQL_LENGTH", 100_000),
             ("SQLITE_LIMIT_COMPOUND_SELECT", 50),
         ):
-            try:  # Python 3.11+
-                conn.setlimit(getattr(sqlite3, limit_name), value)
+            setlimit = getattr(conn, "setlimit", None)  # Python 3.11+
+            if setlimit is None:
+                break
+            try:
+                setlimit(getattr(sqlite3, limit_name), value)
             except (AttributeError, sqlite3.Error):
                 pass
         conn.set_authorizer(_authorizer)

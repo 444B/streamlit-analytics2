@@ -213,7 +213,7 @@ def _overview(events: List[Any]) -> None:
             )
             .properties(height=200)
         )
-        st.altair_chart(heat, width="stretch")
+        _chart(heat)
         if s["peak"]:
             st.caption(
                 f"Busiest hour: {s['peak']['hour']} with {s['peak']['sessions']} "
@@ -304,9 +304,7 @@ def _views_chart(
         )
         .properties(height=140)
     )
-    st.altair_chart(
-        alt.vconcat(area, line, spacing=4).resolve_scale(x="shared"), width="stretch"
-    )
+    _chart(alt.vconcat(area, line, spacing=4).resolve_scale(x="shared"))
 
 
 def _bars(
@@ -329,7 +327,7 @@ def _bars(
     text = base.mark_text(align="left", dx=4, color=pal["muted"]).encode(
         text=f"{value}:Q"
     )
-    st.altair_chart((bars + text).properties(height=24 * len(df) + 10), width="stretch")
+    _chart((bars + text).properties(height=24 * len(df) + 10))
 
 
 def _donut(
@@ -358,7 +356,7 @@ def _donut(
         )
         .properties(height=150)
     )
-    st.altair_chart(chart, width="stretch")
+    _chart(chart)
 
 
 def _raw_query(store: Any, unsafe_password: Optional[str]) -> None:
@@ -523,7 +521,16 @@ def _present(df: pd.DataFrame, pal: Dict[str, Any]) -> None:
             color=colour_enc,
             tooltip=tips,
         )
-    st.altair_chart(chart.properties(height=320), width="stretch")
+    _chart(chart.properties(height=320))
+
+
+def _chart(chart: Any) -> None:
+    """Full-width st.altair_chart on every supported Streamlit: the width
+    argument where it exists (1.5x+), use_container_width before that."""
+    try:
+        st.altair_chart(chart, width="stretch")
+    except TypeError:
+        st.altair_chart(chart, use_container_width=True)
 
 
 def _viewer_offset() -> int:

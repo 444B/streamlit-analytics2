@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1 (2026-09-25)
+
+- Fix: the dashboard raised `altair_chart() got an unexpected keyword argument 'width'` on Streamlit versions before the chart `width` argument existed (1.47 and some later releases). Charts now fall back to `use_container_width` there. Found by the new CI matrix that tests the declared floor.
+- Docs: a full `docs/` set, `llms.txt` and `llms-full.txt` for AI assistants, and the wiki mirrored from `docs/`.
+- Tooling: CI matrix (Python 3.10 to 3.14; Streamlit floor, locked and latest), dependabot for uv and GitHub Actions.
+
 ## 0.11.0 (2026-09-25)
 
 The tracking engine, the data model and the dashboard are new. The public API
