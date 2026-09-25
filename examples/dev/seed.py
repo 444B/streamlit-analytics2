@@ -1,10 +1,11 @@
-"""Seed the dev event log with months of plausible traffic.
+"""Seed a DEV event log with months of made-up traffic. Never run it against
+a real app's log: the numbers are fiction and they only append.
 
-    uv run python examples/dev/seed.py /data/sa2_events.db --months 6
+    uv run python examples/dev/seed.py /data/sa2_events.db --months 6 --yes
 
 Synthetic sessions follow a weekday and office-hours pattern with a slow
 growth trend, a few pages, a spread of browsers and regions, and widget use.
-Safe to rerun: it only appends. Delete the file to start over.
+Delete the file to start over. Only the dev app in examples/dev uses this.
 """
 
 from __future__ import annotations
@@ -159,7 +160,12 @@ def main() -> None:
         "--per-day", type=int, default=18, help="average sessions per weekday now"
     )
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument(
+        "--yes", action="store_true", help="confirm this is a dev log, not a real app's"
+    )
     args = ap.parse_args()
+    if not args.yes:
+        ap.error("refusing without --yes: this writes fake traffic into the log")
     random.seed(args.seed)
     store = open_store(args.path)
     now = dt.datetime.now(dt.timezone.utc)

@@ -179,6 +179,15 @@ def run_query(
                 conn.execute(f"PRAGMA {pragma} = {HEAP_LIMIT_BYTES}")
             except sqlite3.DatabaseError:  # older SQLite without the pragma
                 pass
+        for limit_name, value in (
+            ("SQLITE_LIMIT_LENGTH", 10_000_000),
+            ("SQLITE_LIMIT_SQL_LENGTH", 100_000),
+            ("SQLITE_LIMIT_COMPOUND_SELECT", 50),
+        ):
+            try:  # Python 3.11+
+                conn.setlimit(getattr(sqlite3, limit_name), value)
+            except (AttributeError, sqlite3.Error):
+                pass
         conn.set_authorizer(_authorizer)
         if timeout_seconds is not None:
             deadline = time.monotonic() + timeout_seconds
