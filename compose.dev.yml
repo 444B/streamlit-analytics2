@@ -1,0 +1,19 @@
+# Local dev stack on Exodia. Reachable on the tailnet only:
+#   http://100.103.177.102:8227        the demo app
+#   http://100.103.177.102:8227/?analytics=on   the dashboard
+# Up: docker compose -f compose.dev.yml up -d --build
+services:
+  sa2-dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.dev
+    container_name: sa2-dev
+    restart: unless-stopped
+    ports:
+      - "100.103.177.102:8227:8501"
+    volumes:
+      - .:/app
+      - /mnt/user/appdata/sa2-dev/data:/data
+    environment:
+      - SA2_DATA_DIR=/data
+      - SA2_DASHBOARD_PASSWORD=sa2dev

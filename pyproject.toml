@@ -5,16 +5,21 @@ build-backend = "hatchling.build"
 [project]
 name = "streamlit_analytics2"
 dynamic = ["version"]
-description = "Track & visualize user interactions with your streamlit app."
+description = "Privacy-first usage analytics for Streamlit apps: pageviews, visitors, widget clicks, custom events, a built-in dashboard and SQL over your own data. No JavaScript, no cookies."
 authors = [{ name = "444B", email = "contact+pypi@444b.me" }]
 license = { file = "LICENSE" }
 readme = {file = ".github/README.md", content-type = "text/markdown"}
-keywords = ["streamlit", "analytics", "visualization", "streamlit-analytics", "streamlit-analytics2"]
+keywords = [
+    "streamlit", "analytics", "web-analytics", "product-analytics", "usage-tracking",
+    "privacy", "gdpr", "dashboard", "telemetry", "event-log", "sqlite",
+    "streamlit-analytics", "streamlit-analytics2", "llm-apps", "ai-agents",
+]
 classifiers = [
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Database :: Front-Ends",
     "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: Scientific/Engineering :: Information Analysis",
@@ -25,15 +30,18 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "streamlit>=1.37.0",
+    "streamlit>=1.47.0",
     "pandas>=2.2.3",
     "altair>=5.5.0",
+    # Kept as a default dependency in 0.11 so upgrading Firestore users do not
+    # break; becomes extra-only in 1.0. Install the [firestore] extra to be ready.
     "google-cloud-firestore>=2.19.0",
-    "typing_extensions>=4.12.2",
-    "numpy>=2.2.1",
 ]
 
 [project.optional-dependencies]
+firestore = [
+    "google-cloud-firestore>=2.19.0",
+]
 dev = [
     "black>=24.10.0",
     "isort>=5.13.2",
@@ -137,7 +145,3 @@ exclude_lines = [
 exclude_dirs = ["tests", "docs"]
 skips = ["B311"]
 
-[dependency-groups]
-dev = [
-    "types-toml>=0.10.8.20240310",
-]

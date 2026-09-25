@@ -1,0 +1,61 @@
+# streamlit-analytics2
+
+> Privacy-first usage analytics for Streamlit apps. One `with` block records
+> pageviews, visits, visitors, widget interactions and custom events, shows a
+> dashboard at `?analytics=on`, and keeps an event log you own (JSONL or
+> SQLite). No JavaScript, no cookies, no IP addresses stored.
+
+Package: `streamlit-analytics2` on PyPI. Import name: `streamlit_analytics2`.
+Python 3.10+, Streamlit 1.47+. MIT.
+
+## Minimal integration
+
+```python
+import streamlit as st
+import streamlit_analytics2 as sa2
+
+with sa2.track():
+    st.button("Click me")
+```
+
+Open the app with `?analytics=on` to see the dashboard.
+
+## Persist across restarts
+
+- `sa2.track(save_to_json="analytics.json")`: counters in that file, events in `analytics.events.jsonl`.
+- `sa2.track(events_path="analytics.db")`: SQLite event log; enables the SQL query tab.
+- `sa2.track(store=obj)`: any object with `append(events)` and `read() -> list[Event]`.
+
+## Other arguments of track(), start_tracking(), stop_tracking()
+
+`unsafe_password` (dashboard password; also gates reset and the query tab),
+`load_from_json`, `store_values` (record typed text, default False),
+`session_id`, `firestore_key_file`, `firestore_collection_name`,
+`firestore_document_name`, `firestore_project_name`,
+`streamlit_secrets_firestore_key`, `verbose`.
+
+## Custom events
+
+`sa2.event("report generated", rows=12)` inside the tracked block.
+
+## Data model
+
+Append-only events with fields: ts (ISO 8601 UTC), kind (session | pageview |
+run | widget | custom), session, visitor (daily-rotating hash), page, name,
+widget_id, widget_type, key, value, props (JSON: browser, os, device, locale,
+timezone, theme, utm_*). `streamlit_analytics2.data` holds the legacy
+aggregate counters (total_pageviews, total_script_runs, total_time_seconds,
+per_day, widgets).
+
+## Privacy defaults
+
+Stored: hashed visitor id that rotates daily, browser/OS/device family,
+language, timezone, theme, UTM tags, pages, widget type/label/key/chosen
+option. Not stored: IP, raw User-Agent, query strings, typed text (unless
+`store_values=True`).
+
+## Links
+
+- README: https://github.com/444B/streamlit-analytics2#readme
+- Changelog: https://github.com/444B/streamlit-analytics2/blob/main/CHANGELOG.md
+- Issues: https://github.com/444B/streamlit-analytics2/issues

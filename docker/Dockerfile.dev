@@ -1,0 +1,13 @@
+# Dev container for streamlit-analytics2: the repo is bind-mounted at /app and
+# streamlit reloads on save, so edits to src/ and examples/ show up live.
+FROM python:3.12-slim
+COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_LINK_MODE=copy PYTHONUNBUFFERED=1
+WORKDIR /app
+# Dependencies from the lock only; the project itself is installed editable at
+# start so the bind-mounted source is what runs.
+COPY pyproject.toml uv.lock README.md* ./
+RUN mkdir -p src/streamlit_analytics2 && touch src/streamlit_analytics2/__init__.py \
+ && uv sync --frozen --all-extras --no-install-project
+EXPOSE 8501
+CMD ["sh", "-c", "uv sync --frozen --all-extras --no-dev --quiet && uv run --no-sync streamlit run examples/dev/app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --server.runOnSave true --server.fileWatcherType poll --browser.gatherUsageStats false"]

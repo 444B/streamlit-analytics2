@@ -1,82 +1,143 @@
-# Streamlit-Analytics2
+# streamlit-analytics2
 
-[![PyPi](https://img.shields.io/pypi/v/streamlit-analytics2)](https://pypi.org/project/streamlit-analytics2/)
-[![PyPI Downloads](https://static.pepy.tech/badge/streamlit-analytics2)](https://pepy.tech/projects/streamlit-analytics2)
-[![PyPI Downloads](https://static.pepy.tech/badge/streamlit-analytics2/month)](https://pepy.tech/projects/streamlit-analytics2)
-![Build Status](https://github.com/444B/streamlit-analytics2/actions/workflows/release.yml/badge.svg)
+**Privacy-first usage analytics for Streamlit apps.** One `with` block gives
+you pageviews, visitors, widget clicks, custom events, a built-in dashboard
+and SQL over your own data. No JavaScript, no cookies, no IP addresses stored.
 
-[![CodeFactor](https://www.codefactor.io/repository/github/444b/streamlit-analytics2/badge)](https://www.codefactor.io/repository/github/444b/streamlit-analytics2)
-![Coverage](https://codecov.io/gh/444B/streamlit-analytics2/branch/main/graph/badge.svg)
+[![PyPI](https://img.shields.io/pypi/v/streamlit-analytics2)](https://pypi.org/project/streamlit-analytics2/)
+[![Python](https://img.shields.io/pypi/pyversions/streamlit-analytics2)](https://pypi.org/project/streamlit-analytics2/)
+[![Downloads](https://static.pepy.tech/badge/streamlit-analytics2/month)](https://pepy.tech/projects/streamlit-analytics2)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/444B/streamlit-analytics2/blob/main/LICENSE)
+![Build](https://github.com/444B/streamlit-analytics2/actions/workflows/release.yml/badge.svg)
 
-![Known Vulnerabilities](https://snyk.io/test/github/444B/streamlit-analytics2/badge.svg)
-[![streamlit-analytics2](https://snyk.io/advisor/python/streamlit-analytics2/badge.svg)](https://snyk.io/advisor/python/streamlit-analytics2)
+## Use it
 
-
-## Check it out here! [👉 Demo 👈](https://sa2analyticsdemo.streamlit.app/?analytics=on)
-
-Streamlit Analytics2 is an actively maintained, powerful tool for tracking user interactions and gathering insights from your [Streamlit](https://streamlit.io/) applications. With just a few lines of code, you can gain insight into how your app is being used and making data-driven decisions to improve your app.
-
-> [!Note]
-> This fork is confirmed to fix the deprecation ```st.experimental_get_query_params``` alerts.    [Context](https://docs.streamlit.io/library/api-reference/utilities/st.experimental_get_query_params)  
-> It also resolves 41 security issues that exist in the upstream dependencies (4 Critical, 13 High, 21 Moderate, 3 Low) as of Dec 29th 2024
-
-
-## Getting Started
-
-1. Install the package:
+1. Install:
    ```
    pip install streamlit-analytics2
    ```
-
-2. Import and initialize the tracker in your Streamlit script:
+2. Wrap your app:
    ```python
    import streamlit as st
-   import streamlit_analytics2 as streamlit_analytics
+   import streamlit_analytics2 as sa2
 
-   with streamlit_analytics.track():
-      st.write("Hello, World!")
-      st.button("Click me")
+   with sa2.track():
+       st.write("Hello")
+       st.button("Click me")
+   ```
+3. Open your app with `?analytics=on` on the URL:
+   ```
+   http://localhost:8501/?analytics=on
    ```
 
-3. Run your Streamlit app and append `?analytics=on` to the URL to view the analytics dashboard.
+That is the whole integration. Everything below is optional.
 
+![Dashboard: views, visits, visitors, bounce rate, visit time, active now, views per page over time](https://raw.githubusercontent.com/444B/streamlit-analytics2/main/.github/images/dashboard.png)
 
-## Getting the most out of Streamlit Analytics2
+## Keep the numbers across restarts
 
-Be sure to check out our [Wiki](https://github.com/444B/streamlit-analytics2/wiki) for even more ways to configure the application.
-Some features include:
-- Storing data to json, CSV or Firestore
-- Gathering Session state details based on randomized UUIDs
-- Setting passwords for your analytics dashboards
-- Migration guides
-We welcome contributions to the Wiki as well!
+```python
+with sa2.track(save_to_json="analytics.json"):   # counters + analytics.events.jsonl
+    ...
 
+with sa2.track(events_path="analytics.db"):      # SQLite, unlocks the query tab
+    ...
+```
+
+## Protect the dashboard
+
+```python
+with sa2.track(unsafe_password=st.secrets["analytics_password"]):
+    ...
+```
+
+The password is plain text inside the app, so keep it in `st.secrets` or an
+environment variable and pick something you would not reuse.
+
+## What the dashboard shows
+
+- Views, visits, visitors, bounce rate, average visit time, active now.
+- Views per page over time, hourly for today, with range and page filters.
+- Pages, widgets, browsers, OS, devices, languages, regions, UTM sources and
+  campaigns, custom events.
+- A weekday-by-hour traffic-load heatmap and the busiest hour.
+- Recent visits.
+- **Raw data query**: read-only SQL over the SQLite log, example queries, CSV
+  download and a chart picker. Needs `events_path` on a `.db` file and a
+  password.
+
+Your own runs with `?analytics=on` open are not counted.
+
+![Breakdowns: pages, widgets, browsers, devices, OS, languages, regions](https://raw.githubusercontent.com/444B/streamlit-analytics2/main/.github/images/panels.png)
+
+![Traffic load: weekday by hour heatmap](https://raw.githubusercontent.com/444B/streamlit-analytics2/main/.github/images/heatmap.png)
+
+![Raw data query: SQL over your own event log, shown as a line chart](https://raw.githubusercontent.com/444B/streamlit-analytics2/main/.github/images/query.png)
+
+## Track your own events
+
+```python
+if st.button("Generate report"):
+    sa2.event("report generated", rows=len(df))
+```
+
+## Privacy
+
+Stored per visit: a hash of address and browser that changes every day,
+browser, OS and device family, language, timezone, theme, UTM tags, pages.
+Stored per interaction: widget type, label, key, page and the chosen option.
+
+Never stored: IP addresses, raw User-Agent strings, query strings, or anything
+typed into text fields. Set `store_values=True` if you do want typed text.
+
+## Options
+
+| Argument | Default | What it does |
+|---|---|---|
+| `unsafe_password` | `None` | Password for the dashboard. Also gates the reset and the query tab. |
+| `save_to_json` | `None` | Counters file (0.10 shape). Events go to `<name>.events.jsonl` beside it. |
+| `load_from_json` | `None` | Load counters from that file at start. |
+| `events_path` | `None` | Event log path. `.jsonl` by default, `.db` / `.sqlite` for SQLite. |
+| `store` | `None` | Your own backend: any object with `append(events)` and `read()`. |
+| `store_values` | `False` | Record typed text instead of `<text>`. |
+| `session_id` | `None` | Also keep per-session counters in Firestore under this document. |
+| `firestore_key_file`, `firestore_collection_name`, `firestore_document_name`, `firestore_project_name`, `streamlit_secrets_firestore_key` | | Persist the counters in Firestore. See the [wiki](https://github.com/444B/streamlit-analytics2/wiki). |
+| `verbose` | `False` | Log what is loaded and saved. |
+
+`start_tracking()` and `stop_tracking()` take the same arguments if you
+prefer them to the `with` block. Every event is a plain record (`ts`, `kind`,
+`session`, `visitor`, `page`, `name`, `widget_type`, `key`, `value`, `props`),
+so the log is easy to feed into pandas, DuckDB or an LLM.
+
+## Multipage apps
+
+Call `sa2.track()` on every page. Views and widgets are recorded per page in
+the event log and on the dashboard. The legacy counters in
+`streamlit_analytics2.data` are shared across pages, as before.
+
+## How it works
+
+Streamlit already knows which widget a user changed on each rerun. This
+library reads that from one place instead of wrapping every `st.*` function,
+so widgets inside columns, forms, expanders, tabs, dialogs and the sidebar are
+all seen, and a widget rendering with its default is never counted as a click.
+
+## Upgrading from 0.10
+
+Nothing to change in your code. The numbers will be lower because a widget
+rendering with its default no longer counts as an interaction, typed text is
+no longer stored unless you ask, and the dashboard reset now needs a
+password. Details in
+[CHANGELOG.md](https://github.com/444B/streamlit-analytics2/blob/main/CHANGELOG.md).
 
 ## Contributing
 
-We're actively seeking additional maintainers to help improve Streamlit Analytics2. If you're interested in contributing, please check out our [Contributing Guidelines](https://github.com/444B/streamlit-analytics2/blob/main/.github/CONTRIBUTING.md) to get started. We welcome pull requests, bug reports, feature requests, and any other feedback.
-
-
-## Upcoming Features
-
-We're currently working on a major release that will introduce exciting new features and enhancements:
-
-- Multi-page tracking: Monitor user interactions across multiple pages of your Streamlit app.
-- Improved metrics accuracy: Get more precise and reliable usage metrics.
-- Flexible data formats: Choose between CSV or JSON for storing and exporting analytics data.
-- Customization screen: Easily configure and customize the analytics settings through a user-friendly interface.
-
-Stay tuned for more updates and join our [community](https://github.com/444B/streamlit-analytics2/discussions) to be part of shaping the future of Streamlit Analytics2!
-
-
-## Multipage tracking status:
-|Method|Status|
-|-|-|
-|main.py|✅ (Works)|
-|[pages/ directory](https://docs.streamlit.io/develop/concepts/multipage-apps/pages-directory)|❌ (Not Working)|
-|[st.Page + st.navigation](https://docs.streamlit.io/develop/concepts/multipage-apps/page-and-navigation)|🤷 (Checking)|
-
+Issues and pull requests are welcome. See
+[CONTRIBUTING.md](https://github.com/444B/streamlit-analytics2/blob/main/.github/CONTRIBUTING.md).
+Development: `uv sync --all-extras && uv run pytest`. A dev app with every
+widget type lives in `examples/dev/`; `examples/dev/seed.py` fills a dev log
+with made-up traffic so the dashboard has something to show.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more information.
+MIT. See [LICENSE](https://github.com/444B/streamlit-analytics2/blob/main/LICENSE).
