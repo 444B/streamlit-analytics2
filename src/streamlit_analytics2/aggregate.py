@@ -80,6 +80,8 @@ def summarize(
     visitors_by_bucket_day: Dict[str, set] = defaultdict(set)
     views_by_bucket_hour: Counter = Counter()
     visitors_by_bucket_hour: Dict[str, set] = defaultdict(set)
+    page_views_day: Counter = Counter()  # (day, page) -> views
+    page_views_hour: Counter = Counter()  # (hour, page) -> views
     load: Counter = Counter()  # (weekday, hour) -> runs
     sessions_by_hour: Dict[str, set] = defaultdict(set)
     pages: Counter = Counter()
@@ -110,6 +112,8 @@ def summarize(
             hour = local.strftime("%Y-%m-%d %H:00")
             views_by_bucket_day[day] += 1
             views_by_bucket_hour[hour] += 1
+            page_views_day[(day, p)] += 1
+            page_views_hour[(hour, p)] += 1
             if e.visitor:
                 visitors_by_bucket_day[day].add(e.visitor)
                 visitors_by_bucket_hour[hour].add(e.visitor)
@@ -221,6 +225,14 @@ def summarize(
                 "visitors": len(visitors_by_bucket_hour[h]),
             }
             for h in hours
+        ],
+        "series_day_pages": [
+            {"when": d, "page": pg, "views": n}
+            for (d, pg), n in sorted(page_views_day.items())
+        ],
+        "series_hour_pages": [
+            {"when": h, "page": pg, "views": n}
+            for (h, pg), n in sorted(page_views_hour.items())
         ],
         "load": [
             {"weekday": wd, "hour": h, "runs": n} for (wd, h), n in sorted(load.items())

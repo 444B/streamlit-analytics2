@@ -9,7 +9,9 @@ import streamlit as st
 
 import streamlit_analytics2 as sa2
 
-DATA = Path(os.environ.get("SA2_DATA_DIR", ".")) / "sa2_data.json"
+DATA_DIR = Path(os.environ.get("SA2_DATA_DIR", "."))
+DATA = DATA_DIR / "sa2_data.json"  # legacy counters, 0.10 shape
+EVENTS = DATA_DIR / "sa2_events.db"  # event log, SQLite backend
 
 
 def main() -> None:
@@ -53,5 +55,5 @@ def main() -> None:
         st.sidebar.success("sa2.event('report generated', rows=42)")
 
 
-with sa2.track(save_to_json=DATA, load_from_json=DATA):
+with sa2.track(save_to_json=DATA, load_from_json=DATA, events_path=EVENTS):
     main()
