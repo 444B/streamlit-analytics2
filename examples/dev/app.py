@@ -19,7 +19,7 @@ def main() -> None:
         "Add `?analytics=on` to the URL for the dashboard."
     )
 
-    st.header("Plain widgets (tracked in 0.10)")
+    st.header("Plain widgets")
     name = st.text_input("Write your name")
     fav = st.selectbox("Select your favorite", ["cat", "dog", "flower"])
     if st.button("Click me"):
@@ -27,7 +27,7 @@ def main() -> None:
     st.slider("Pick a number", 0, 10, 5)
     st.checkbox("Tick me")
 
-    st.header("Containers (invisible to 0.10)")
+    st.header("Containers (invisible to 0.10, tracked in 0.11)")
     c1, c2 = st.columns(2)
     c1.button("Column button")
     with c2:
@@ -38,9 +38,8 @@ def main() -> None:
         st.form_submit_button("Send")
     with st.expander("More"):
         st.multiselect("Tags", ["a", "b", "c"])
-        if st.session_state.get("show_issue_13"):
-            # Crashes the 0.10 engine with KeyError ' ' (issue 13).
-            st.selectbox("Optional choice", ["x", "y"], index=None)
+        # Crashed the 0.10 engine with KeyError ' ' (issue 13).
+        st.selectbox("Optional choice", ["x", "y"], index=None)
 
     st.header("Same label, different key")
     st.button("Same label")
@@ -49,9 +48,9 @@ def main() -> None:
     st.sidebar.header("Sidebar")
     st.sidebar.checkbox("Sidebar checkbox")
     st.sidebar.selectbox("Sidebar pick", ["one", "two"])
-    st.sidebar.toggle(
-        "Show issue 13 widget (crashes 0.10)", key="show_issue_13"
-    )
+    if st.sidebar.button("Fire custom event"):
+        sa2.event("report generated", rows=42)
+        st.sidebar.success("sa2.event('report generated', rows=42)")
 
 
 with sa2.track(save_to_json=DATA, load_from_json=DATA):

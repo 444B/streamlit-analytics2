@@ -1,12 +1,23 @@
-"""
-Streamlit Analytics 2
-Track & visualize user interactions with your streamlit app.
-"""
+"""streamlit-analytics2: track usage of Streamlit apps."""
 
-from .main import start_tracking, stop_tracking, track  # noqa: F401
-from .state import data  # noqa: F401
+import logging
 
-from .state import data as counts  # noqa: F401  # isort:skip
+from .main import event, start_tracking, stop_tracking, track  # noqa: F401
+from .state import data, reset_data  # noqa: F401
+from .storage import JsonlStore, MemoryStore, SqliteStore  # noqa: F401
 
-__version__ = "0.10.7"
-__name__ = "streamlit_analytics2"
+logging.getLogger("streamlit_analytics2").addHandler(logging.NullHandler())
+
+__version__ = "0.11.0"
+__all__ = [
+    "track",
+    "start_tracking",
+    "stop_tracking",
+    "event",
+    "data",
+    "reset_data",
+    "JsonlStore",
+    "SqliteStore",
+    "MemoryStore",
+    "__version__",
+]

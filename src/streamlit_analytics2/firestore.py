@@ -1,100 +1,90 @@
+"""Legacy Firestore persistence of the aggregate counters.
+
+Needs the extra: ``pip install "streamlit-analytics2[firestore]"``.
+"""
+
+from __future__ import annotations
+
 import json
+from typing import Any, Dict, Optional
 
 import streamlit as st
-from google.cloud import firestore
-from google.oauth2 import service_account
 from streamlit import session_state as ss
 
 from .state import data  # noqa: F401
 
 
-def sanitize_data(data):  # noqa: F811
+def _client(
+    service_account_json: Optional[str],
+    streamlit_secrets_firestore_key: Optional[str],
+    firestore_project_name: Optional[str],
+) -> Any:
+    try:
+        from google.cloud import firestore
+        from google.oauth2 import service_account
+    except ImportError as exc:  # pragma: no cover - depends on the extra
+        raise ImportError(
+            "Firestore support needs the extra: "
+            "pip install 'streamlit-analytics2[firestore]'"
+        ) from exc
+    if streamlit_secrets_firestore_key is not None:
+        # https://blog.streamlit.io/streamlit-firestore-continued/#part-4-securely-deploying-on-streamlit-sharing
+        key_dict = json.loads(st.secrets[streamlit_secrets_firestore_key])
+        creds = service_account.Credentials.from_service_account_info(key_dict)
+        return firestore.Client(credentials=creds, project=firestore_project_name)
+    return firestore.Client.from_service_account_json(service_account_json)
+
+
+def sanitize_data(data: Any) -> Any:  # noqa: F811
+    """Firestore keys must be non-empty strings."""
     if isinstance(data, dict):
-        # Recursively sanitize dictionary keys
-        return {
-            str(k) if k else "": sanitize_data(v) for k, v in data.items() if k
-        }  # noqa: E501
-    elif isinstance(data, list):
-        # Apply sanitization to elements in lists
+        return {str(k): sanitize_data(v) for k, v in data.items() if k}
+    if isinstance(data, list):
         return [sanitize_data(item) for item in data]
-    else:
-        return data
+    return data
 
 
 def load(
-    data,  # noqa: F811
-    service_account_json,
-    collection_name,
-    document_name,
-    streamlit_secrets_firestore_key,
-    firestore_project_name,
-    session_id=None,
-):
+    data: Dict[str, Any],  # noqa: F811
+    service_account_json: Optional[str],
+    collection_name: Optional[str],
+    document_name: Optional[str],
+    streamlit_secrets_firestore_key: Optional[str],
+    firestore_project_name: Optional[str],
+    session_id: Optional[str] = None,
+) -> None:
     """Load count data from firestore into `data`."""
-    firestore_data = None
-    firestore_session_data = None
-
-    if streamlit_secrets_firestore_key is not None:
-        # Following along here
-        # https://blog.streamlit.io/streamlit-firestore-continued/#part-4-securely-deploying-on-streamlit-sharing  # noqa: E501
-        # for deploying to Streamlit Cloud with Firestore
-        key_dict = json.loads(st.secrets[streamlit_secrets_firestore_key])
-        creds = service_account.Credentials.from_service_account_info(key_dict)
-        db = firestore.Client(credentials=creds, project=firestore_project_name)
-        col = db.collection(collection_name)
-        firestore_data = col.document(document_name).get().to_dict()
-        if session_id is not None:
-            firestore_session_data = col.document(session_id).get().to_dict()
-    else:
-        db = firestore.Client.from_service_account_json(service_account_json)
-        col = db.collection(collection_name)
-        firestore_data = col.document(document_name).get().to_dict()
-        if session_id is not None:
-            firestore_session_data = col.document(session_id).get().to_dict()
-
-    if firestore_data is not None:
+    db = _client(
+        service_account_json, streamlit_secrets_firestore_key, firestore_project_name
+    )
+    col = db.collection(collection_name)
+    firestore_data = col.document(document_name).get().to_dict()
+    if firestore_data:
         for key in firestore_data:
             if key in data:
                 data[key] = firestore_data[key]
-
-    if firestore_session_data is not None:
-        for key in firestore_session_data:
-            if key in ss.session_data:
-                ss.session_data[key] = firestore_session_data[key]
-
-    # Log loaded data for debugging
-    # logging.debug("Data loaded from Firestore: %s", firestore_data)
+    if session_id is not None:
+        session_doc = col.document(session_id).get().to_dict()
+        if session_doc:
+            for key in session_doc:
+                if key in ss.session_data:
+                    ss.session_data[key] = session_doc[key]
 
 
 def save(
-    data,  # noqa: F811
-    service_account_json,
-    collection_name,
-    document_name,
-    streamlit_secrets_firestore_key,
-    firestore_project_name,
-    session_id=None,
-):
-    """Save count data from `data` to firestore."""
-
-    # Ensure all keys are strings and not empty
-    sanitized_data = sanitize_data(data)
-
-    if streamlit_secrets_firestore_key is not None:
-        # Following along here https://blog.streamlit.io/streamlit-firestore-continued/#part-4-securely-deploying-on-streamlit-sharing  # noqa: E501
-        # for deploying to Streamlit Cloud with Firestore
-        key_dict = json.loads(st.secrets[streamlit_secrets_firestore_key])
-        creds = service_account.Credentials.from_service_account_info(key_dict)
-        db = firestore.Client(credentials=creds, project=firestore_project_name)
-    else:
-        db = firestore.Client.from_service_account_json(service_account_json)
+    data: Dict[str, Any],  # noqa: F811
+    service_account_json: Optional[str],
+    collection_name: Optional[str],
+    document_name: Optional[str],
+    streamlit_secrets_firestore_key: Optional[str],
+    firestore_project_name: Optional[str],
+    session_id: Optional[str] = None,
+) -> None:
+    """Save count data from `data` to firestore (merge keeps foreign fields)."""
+    db = _client(
+        service_account_json, streamlit_secrets_firestore_key, firestore_project_name
+    )
     col = db.collection(collection_name)
-    # TODO pass user set argument via config screen for the name of document
-    # currently hard coded to be "counts"
-
-    # Attempt to save to Firestore
-    # creates if doesn't exist
-    col.document(document_name).set(sanitized_data)
+    col.document(document_name).set(sanitize_data(data), merge=True)
     if session_id is not None:
-        sanitized_session_data = sanitize_data(ss.session_data)
-        col.document(session_id).set(sanitized_session_data)
+        col.document(session_id).set(sanitize_data(ss.session_data), merge=True)

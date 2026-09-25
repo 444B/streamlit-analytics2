@@ -1,50 +1,43 @@
-"""
-Main API functions for the user to start and stop analytics tracking.
+"""Public API: track / start_tracking / stop_tracking / event.
+
+Every call signature from 0.10 is kept. New keyword-only options:
+``store_values`` (record free text, off by default), ``events_path`` (JSONL or
+SQLite event log) and ``store`` (your own backend).
 """
 
+from __future__ import annotations
+
 import datetime
+import hashlib
 import json
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Union, cast
 
 import streamlit as st
 from streamlit import session_state as ss
 
-from . import config, display, firestore, utils, widgets  # noqa: F811 F401
-from . import wrappers as _wrap
+from . import aggregate, capture, display
+from . import events as ev
+from . import firestore, storage, utils
 from .state import data, reset_data
 
-# from streamlit_searchbox import st_searchbox
+log = logging.getLogger("streamlit_analytics2")
 
-# TODO look into https://github.com/444B/streamlit-analytics2/pull/119 to
-# integrate
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format="streamlit-analytics2: %(levelname)s: %(message)s"
-# )
-# Uncomment this during testing
-# logging.info("SA2: Streamlit-analytics2 successfully imported")
+PathLike = Union[str, Path]
+
+_memory_store = storage.MemoryStore()
+_json_loaded: set = set()
+
+_CFG = "_sa2_cfg"
+_PENDING = "_sa2_pending"
 
 
-def update_session_stats(data_dict: Dict[str, Any]):
-    """
-    Update the session data with the current state.
-
-    Parameters
-    ----------
-    data : Dict[str, Any]
-        Data, either aggregate or session-specific.
-
-    Returns
-    -------
-    Dict[str, Any]
-        Updated data with the current state of time-dependent elements.
-    """
+def update_session_stats(data_dict: Dict[str, Any]) -> None:
+    """Legacy per-run counters (pageviews, script runs, time, per day)."""
     today = str(datetime.date.today())
     if data_dict["per_day"]["days"][-1] != today:
-        # TODO: Insert 0 for all days between today and last entry.
         data_dict["per_day"]["days"].append(today)
         data_dict["per_day"]["pageviews"].append(0)
         data_dict["per_day"]["script_runs"].append(0)
@@ -61,450 +54,330 @@ def update_session_stats(data_dict: Dict[str, Any]):
         data_dict["per_day"]["pageviews"][-1] += 1
 
 
-def _track_user():
-    """Track individual pageviews by storing user id to session state."""
+def _track_user() -> None:
     update_session_stats(data)
     update_session_stats(ss.session_data)
 
 
+def _visitor_id() -> Optional[str]:
+    """Daily-rotating hash of ip + user agent. Never stored raw."""
+    try:
+        ctx = st.context
+        ip = ctx.ip_address or ""
+        ua = ctx.headers.get("User-Agent", "") if ctx.headers else ""
+    except Exception:
+        return None
+    if not ip and not ua:
+        return None
+    salt = datetime.date.today().isoformat()
+    return hashlib.sha256(f"{salt}|{ip}|{ua}".encode()).hexdigest()[:16]
+
+
+def _session_id() -> str:
+    ctx = capture._ctx()
+    return ctx.session_id if ctx is not None else "no-session"
+
+
+def _resolve_store(cfg: Dict[str, Any]) -> storage.Store:
+    if cfg.get("store") is not None:
+        return cast(storage.Store, cfg["store"])
+    path = cfg.get("events_path") or storage.events_path_for(cfg.get("save_to_json"))
+    if path is not None:
+        return storage.open_store(path)
+    return _memory_store
+
+
+def _load_json_once(path: PathLike, verbose: bool) -> None:
+    key = str(Path(path).resolve())
+    if key in _json_loaded:
+        return
+    _json_loaded.add(key)
+    try:
+        json_data = json.loads(Path(path).read_text())
+        data.update({k: json_data[k] for k in json_data if k in data})
+        if verbose:
+            log.info("Loaded data from %s", path)
+    except FileNotFoundError:
+        if verbose:
+            log.warning("File %s not found, proceeding with empty data", path)
+    except Exception as exc:
+        log.error("Error loading data from %s: %s", path, exc)
+
+
+def _use_firestore(cfg: Dict[str, Any]) -> bool:
+    return bool(cfg.get("firestore_key_file")) or (
+        cfg.get("streamlit_secrets_firestore_key") is not None
+        and cfg.get("firestore_project_name") is not None
+    )
+
+
 def start_tracking(
     unsafe_password: Optional[str] = None,
-    save_to_json: Optional[Union[str, Path]] = None,
-    load_from_json: Optional[Union[str, Path]] = None,
+    save_to_json: Optional[PathLike] = None,
+    load_from_json: Optional[PathLike] = None,
     firestore_project_name: Optional[str] = None,
     firestore_collection_name: Optional[str] = None,
     firestore_document_name: Optional[str] = "counts",
     firestore_key_file: Optional[str] = None,
     streamlit_secrets_firestore_key: Optional[str] = None,
     session_id: Optional[str] = None,
-    verbose=False,
-):
-    """
-    Start tracking user inputs to a streamlit app.
+    verbose: bool = False,
+    *,
+    store_values: bool = False,
+    events_path: Optional[PathLike] = None,
+    store: Optional[storage.Store] = None,
+) -> None:
+    """Start tracking user inputs to a streamlit app.
 
-    If you call this function directly, you NEED to call `streamlit_analytics.
-    stop_tracking()` at the end of your streamlit script. For a more convenient
-    interface, wrap your streamlit calls in `with streamlit_analytics.track():`.
+    If you call this function directly, you NEED to call `stop_tracking()` at
+    the end of your streamlit script. For a more convenient interface, wrap
+    your streamlit calls in `with streamlit_analytics2.track():`.
     """
+    cfg = dict(
+        unsafe_password=unsafe_password,
+        save_to_json=save_to_json,
+        load_from_json=load_from_json,
+        firestore_project_name=firestore_project_name,
+        firestore_collection_name=firestore_collection_name,
+        firestore_document_name=firestore_document_name,
+        firestore_key_file=firestore_key_file,
+        streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
+        session_id=session_id,
+        verbose=verbose,
+        store_values=store_values,
+        events_path=events_path,
+        store=store,
+    )
+    if verbose and not log.handlers:
+        log.addHandler(logging.StreamHandler())
+        log.setLevel(logging.INFO)
+
     utils.initialize_session_data()
-
-    if (
-        streamlit_secrets_firestore_key is not None
-        and not data["loaded_from_firestore"]
-    ):
-        # Load both global and session data in a single call
-        firestore.load(
-            data=data,
-            service_account_json=None,
-            collection_name=firestore_collection_name,
-            document_name=firestore_document_name,
-            streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
-            firestore_project_name=firestore_project_name,
-            session_id=session_id,  # This will load global and session data
-        )
-        data["loaded_from_firestore"] = True
-        if verbose:
-            print("Loaded count data from firestore:")
-            print(data)
-            if session_id:
-                print("Loaded session count data from firestore:")
-                print(ss.session_data)
-            print()
-
-    elif firestore_key_file and not data["loaded_from_firestore"]:
+    if _use_firestore(cfg) and not data["loaded_from_firestore"]:
         firestore.load(
             data,
             firestore_key_file,
             firestore_collection_name,
             firestore_document_name,
-            streamlit_secrets_firestore_key=None,
-            firestore_project_name=None,
+            streamlit_secrets_firestore_key,
+            firestore_project_name,
             session_id=session_id,
         )
         data["loaded_from_firestore"] = True
-        if verbose:
-            print("Loaded count data from firestore:")
-            print(data)
-            print()
-
     if load_from_json is not None:
-        log_msg_prefix = "Loading data from json: "
-        try:
-            # Using Path's read_text method simplifies file reading
-            json_contents = Path(load_from_json).read_text()
-            json_data = json.loads(json_contents)
+        _load_json_once(load_from_json, verbose)
 
-            # Use dict.update() for a cleaner way to merge the data
-            # This assumes you want json_data to overwrite existing keys in data
-            data.update({k: json_data[k] for k in json_data if k in data})
-
-            if verbose:
-                logging.info(f"{log_msg_prefix}{load_from_json}")
-                logging.info("SA2: Success! Loaded data:")
-                logging.info(data)
-
-        except FileNotFoundError:
-            if verbose:
-                logging.warning(f"SA2: File {load_from_json} not found")
-                logging.warning("Proceeding with empty data.")
-
-        except Exception as e:
-            # Catch-all for any other exceptions, log the error
-            logging.error(f"SA2: Error loading data from {load_from_json}: {e}")
-
-    # Reset session state.
     if "user_tracked" not in st.session_state:
         st.session_state.user_tracked = False
-    if "state_dict" not in st.session_state:
-        st.session_state.state_dict = {}
     if "last_time" not in st.session_state:
         st.session_state.last_time = datetime.datetime.now()
+    first_run = not st.session_state.user_tracked
     _track_user()
 
-    # widgets.monkey_patch()
-    # Monkey-patch streamlit to call the wrappers above.
-    st.button = _wrap.button(_orig_button)
-    st.checkbox = _wrap.checkbox(_orig_checkbox)
-    st.radio = _wrap.select(_orig_radio)
-    st.selectbox = _wrap.select(_orig_selectbox)
-    st.multiselect = _wrap.multiselect(_orig_multiselect)
-    st.slider = _wrap.value(_orig_slider)
-    st.select_slider = _wrap.select(_orig_select_slider)
-    st.text_input = _wrap.value(_orig_text_input)
-    st.number_input = _wrap.value(_orig_number_input)
-    st.text_area = _wrap.value(_orig_text_area)
-    st.date_input = _wrap.value(_orig_date_input)
-    st.time_input = _wrap.value(_orig_time_input)
-    st.file_uploader = _wrap.file_uploader(_orig_file_uploader)
-    st.color_picker = _wrap.value(_orig_color_picker)
-    # new elements, testing
-    # st.download_button = _wrap.value(_orig_download_button)
-    # st.link_button = _wrap.value(_orig_link_button)
-    # st.page_link = _wrap.value(_orig_page_link)
-    # st.toggle = _wrap.value(_orig_toggle)
-    # st.camera_input = _wrap.value(_orig_camera_input)
-    st.chat_input = _wrap.chat_input(_orig_chat_input)
-    # st_searchbox = _wrap.searchbox(_orig_searchbox)
+    # Traffic events: no patching involved.
+    ctx = capture._ctx()
+    sid = ctx.session_id if ctx is not None else "no-session"
+    page = capture.page_of(ctx) if ctx is not None else None
+    visitor = _visitor_id()
+    now = ev.now_iso()
+    pending: List[ev.Event] = []
+    if first_run:
+        props: Dict[str, Any] = {}
+        try:
+            props = {
+                k: v
+                for k, v in {
+                    "locale": st.context.locale,
+                    "timezone": st.context.timezone,
+                    "embedded": st.context.is_embedded,
+                }.items()
+                if v
+            }
+        except Exception:
+            log.debug("st.context unavailable", exc_info=True)
+        pending.append(
+            ev.Event(now, ev.SESSION, sid, visitor, page, props=props or None)
+        )
+    if first_run or st.session_state.get("_sa2_page") != page:
+        st.session_state["_sa2_page"] = page
+        pending.append(ev.Event(now, ev.PAGEVIEW, sid, visitor, page))
+    pending.append(ev.Event(now, ev.RUN, sid, visitor, page))
 
-    st.sidebar.button = _wrap.button(_orig_sidebar_button)  # type: ignore
-    st.sidebar.radio = _wrap.select(_orig_sidebar_radio)  # type: ignore
-    st.sidebar.selectbox = _wrap.select(_orig_sidebar_selectbox)  # type: ignore
-    st.sidebar.multiselect = _wrap.multiselect(_orig_sidebar_multiselect)  # type: ignore
-    st.sidebar.slider = _wrap.value(_orig_sidebar_slider)  # type: ignore
-    st.sidebar.select_slider = _wrap.select(_orig_sidebar_select_slider)  # type: ignore
-    st.sidebar.text_input = _wrap.value(_orig_sidebar_text_input)  # type: ignore
-    st.sidebar.number_input = _wrap.value(_orig_sidebar_number_input)  # type: ignore
-    st.sidebar.text_area = _wrap.value(_orig_sidebar_text_area)  # type: ignore
-    st.sidebar.date_input = _wrap.value(_orig_sidebar_date_input)  # type: ignore
-    st.sidebar.time_input = _wrap.value(_orig_sidebar_time_input)  # type: ignore
-    st.sidebar.file_uploader = _wrap.file_uploader(_orig_sidebar_file_uploader)  # type: ignore
-    st.sidebar.color_picker = _wrap.value(_orig_sidebar_color_picker)  # type: ignore
-    # st.sidebar.st_searchbox = _wrap.searchbox(_orig_sidebar_searchbox)
+    st.session_state[_CFG] = cfg
+    st.session_state[_PENDING] = pending
+    if capture.install():
+        capture.begin(sid)
 
-    # new elements, testing
-    # st.sidebar.download_button = _wrap.value(_orig_sidebar_download_button)
-    # st.sidebar.link_button = _wrap.value(_orig_sidebar_link_button)
-    # st.sidebar.page_link = _wrap.value(_orig_sidebar_page_link)
-    # st.sidebar.toggle = _wrap.value(_orig_sidebar_toggle)
-    # st.sidebar.camera_input = _wrap.value(_orig_sidebar_camera_input)
 
-    # replacements = {
-    #     "button": _wrap.bool,
-    #     "checkbox": _wrap.bool,
-    #     "radio": _wrap.select,
-    #     "selectbox": _wrap.select,
-    #     "multiselect": _wrap.multiselect,
-    #     "slider": _wrap.value,
-    #     "select_slider": _wrap.select,
-    #     "text_input": _wrap.value,
-    #     "number_input": _wrap.value,
-    #     "text_area": _wrap.value,
-    #     "date_input": _wrap.value,
-    #     "time_input": _wrap.value,
-    #     "file_uploader": _wrap.file_uploader,
-    #     "color_picker": _wrap.value,
-    # }
+def event(name: str, **props: Any) -> None:
+    """Record a custom event from app code, e.g. ``sa2.event("report", rows=12)``.
 
-    if verbose:
-        logging.info("\nSA2:  streamlit-analytics2 verbose logging")
+    Call it inside ``with track():`` (or between start and stop). Outside a
+    tracked run the event goes to the in-memory store only.
+    """
+    e = ev.Event(
+        ev.now_iso(),
+        ev.CUSTOM,
+        _session_id(),
+        _visitor_id(),
+        st.session_state.get("_sa2_page"),
+        name=name,
+        props=props or None,
+    )
+    pending = st.session_state.get(_PENDING)
+    if pending is not None:
+        pending.append(e)
+    else:
+        _memory_store.append([e])
 
 
 def stop_tracking(
     unsafe_password: Optional[str] = None,
-    save_to_json: Optional[Union[str, Path]] = None,
-    load_from_json: Optional[Union[str, Path]] = None,
+    save_to_json: Optional[PathLike] = None,
+    load_from_json: Optional[PathLike] = None,
     firestore_project_name: Optional[str] = None,
     firestore_collection_name: Optional[str] = None,
     firestore_document_name: Optional[str] = "counts",
     firestore_key_file: Optional[str] = None,
     streamlit_secrets_firestore_key: Optional[str] = None,
     session_id: Optional[str] = None,
-    verbose=False,
-):
-    """
-    Stop tracking user inputs to a streamlit app.
+    verbose: bool = False,
+    *,
+    store_values: Optional[bool] = None,
+    events_path: Optional[PathLike] = None,
+    store: Optional[storage.Store] = None,
+) -> None:
+    """Stop tracking user inputs to a streamlit app.
 
-    Should be called after `streamlit-analytics.start_tracking()`.
-    This method also shows the analytics results below your app if you attach
-    `?analytics=on` to the URL.
+    Should be called after `start_tracking()`. This method also shows the
+    analytics results below your app if you attach `?analytics=on` to the URL.
     """
-
+    cfg: Dict[str, Any] = dict(st.session_state.get(_CFG) or {})
+    for k, v in dict(
+        unsafe_password=unsafe_password,
+        save_to_json=save_to_json,
+        load_from_json=load_from_json,
+        firestore_project_name=firestore_project_name,
+        firestore_collection_name=firestore_collection_name,
+        firestore_key_file=firestore_key_file,
+        streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
+        session_id=session_id,
+        store_values=store_values,
+        events_path=events_path,
+        store=store,
+    ).items():
+        if v is not None:
+            cfg[k] = v
+    if firestore_document_name != "counts" or "firestore_document_name" not in cfg:
+        cfg["firestore_document_name"] = firestore_document_name
     if verbose:
-        logging.info("SA2: Finished script execution. New data:")
-        logging.info(
-            "%s", data
-        )  # Use %s and pass data to logging to handle complex objects
-        logging.info("%s", "-" * 80)  # For separators or multi-line messages
+        cfg["verbose"] = True
 
-    # widgets.reset_widgets()
+    sid = _session_id()
+    pending: List[ev.Event] = list(st.session_state.pop(_PENDING, []) or [])
+    page = st.session_state.get("_sa2_page")
+    visitor = pending[0].visitor if pending else _visitor_id()
+    now = ev.now_iso()
+    for change in capture.end(sid):
+        name = aggregate.widget_name(change.label, change.key, change.widget_id)
+        for value in capture.record_values(change, bool(cfg.get("store_values"))):
+            aggregate.apply_widget(data, change.widget_type, name, value)
+            aggregate.apply_widget(ss.session_data, change.widget_type, name, value)
+            pending.append(
+                ev.Event(
+                    now,
+                    ev.WIDGET,
+                    sid,
+                    visitor,
+                    page,
+                    name=change.label or None,
+                    widget_id=change.widget_id,
+                    widget_type=change.widget_type,
+                    key=change.key,
+                    value=value,
+                )
+            )
 
-    # Reset streamlit functions.
-    st.button = _orig_button
-    st.checkbox = _orig_checkbox
-    st.radio = _orig_radio
-    st.selectbox = _orig_selectbox
-    st.multiselect = _orig_multiselect
-    st.slider = _orig_slider
-    st.select_slider = _orig_select_slider
-    st.text_input = _orig_text_input
-    st.number_input = _orig_number_input
-    st.text_area = _orig_text_area
-    st.date_input = _orig_date_input
-    st.time_input = _orig_time_input
-    st.file_uploader = _orig_file_uploader
-    st.color_picker = _orig_color_picker
-    # new elements, testing
-    # st.download_button = _orig_download_button
-    # st.link_button = _orig_link_button
-    # st.page_link = _orig_page_link
-    # st.toggle = _orig_toggle
-    # st.camera_input = _orig_camera_input
-    st.chat_input = _orig_chat_input
-    # st.searchbox = _orig_searchbox
-    st.sidebar.button = _orig_sidebar_button  # type: ignore
-    st.sidebar.checkbox = _orig_sidebar_checkbox  # type: ignore
-    st.sidebar.radio = _orig_sidebar_radio  # type: ignore
-    st.sidebar.selectbox = _orig_sidebar_selectbox  # type: ignore
-    st.sidebar.multiselect = _orig_sidebar_multiselect  # type: ignore
-    st.sidebar.slider = _orig_sidebar_slider  # type: ignore
-    st.sidebar.select_slider = _orig_sidebar_select_slider  # type: ignore
-    st.sidebar.text_input = _orig_sidebar_text_input  # type: ignore
-    st.sidebar.number_input = _orig_sidebar_number_input  # type: ignore
-    st.sidebar.text_area = _orig_sidebar_text_area  # type: ignore
-    st.sidebar.date_input = _orig_sidebar_date_input  # type: ignore
-    st.sidebar.time_input = _orig_sidebar_time_input  # type: ignore
-    st.sidebar.file_uploader = _orig_sidebar_file_uploader  # type: ignore
-    st.sidebar.color_picker = _orig_sidebar_color_picker  # type: ignore
-    # new elements, testing
-    # st.sidebar.download_button = _orig_sidebar_download_button
-    # st.sidebar.link_button = _orig_sidebar_link_button
-    # st.sidebar.page_link = _orig_sidebar_page_link
-    # st.sidebar.toggle = _orig_sidebar_toggle
-    # st.sidebar.camera_input = _orig_sidebar_camera_input
-    # st.sidebar.searchbox = _orig_sidebar_searchbox
-    # Save count data to firestore.
-    # TODO: Maybe don't save on every iteration but on regular intervals in a
-    # background thread.
+    active_store = _resolve_store(cfg)
+    try:
+        active_store.append(pending)
+    except Exception as exc:
+        log.error("streamlit-analytics2: could not store events: %s", exc)
 
-    if (
-        streamlit_secrets_firestore_key is not None
-        and firestore_project_name is not None
-    ):
-        if verbose:
-            print("Saving count data to firestore:")
-            print(data)
-            print("Saving session count data to firestore:")
-            print(ss.session_data)
-            print()
+    if cfg.get("verbose"):
+        log.info("Finished script execution. New data: %s", data)
 
-        # Save both global and session data in a single call
-        firestore.save(
-            data=data,
-            service_account_json=None,
-            collection_name=firestore_collection_name,
-            document_name=firestore_document_name,
-            streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
-            firestore_project_name=firestore_project_name,
-            session_id=session_id,  # This will save global and session data
-        )
-
-    elif (
-        streamlit_secrets_firestore_key is None
-        and firestore_project_name is None
-        and firestore_key_file
-    ):
-        if verbose:
-            print("Saving count data to firestore:")
-            print(data)
-            print()
+    if _use_firestore(cfg):
         firestore.save(
             data,
-            firestore_key_file,
-            firestore_collection_name,
-            firestore_document_name,
-            streamlit_secrets_firestore_key=None,
-            firestore_project_name=None,
-            session_id=session_id,
+            cfg.get("firestore_key_file"),
+            cfg.get("firestore_collection_name"),
+            cfg.get("firestore_document_name"),
+            cfg.get("streamlit_secrets_firestore_key"),
+            cfg.get("firestore_project_name"),
+            session_id=cfg.get("session_id"),
         )
 
-    # Dump the data to json file if `save_to_json` is set.
-    # TODO: Make sure this is not locked if writing from multiple threads.
-
-    # Assuming 'data' is your data to be saved and 'save_to_json' is the path
-    # to your json file.
-    if save_to_json is not None:
-        # Create a Path object for the file
-        file_path = Path(save_to_json)
-
-        # Ensure the directory containing the file exists
+    if cfg.get("save_to_json") is not None:
+        file_path = Path(cfg["save_to_json"])
         file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Open the file and dump the json data
         with file_path.open("w") as f:
             json.dump(data, f)
+        if cfg.get("verbose"):
+            log.info("Storing results to file: %s", file_path)
 
-        if verbose:
-            print("Storing results to file:", save_to_json)
-
-    # Show analytics results in the streamlit app if `?analytics=on` is set in
-    # the URL.
     query_params = st.query_params
     if "analytics" in query_params and "on" in query_params["analytics"]:
 
         @st.dialog("Streamlit-Analytics2", width="large")
-        def show_sa2(data, reset_data, unsafe_password):
+        def show_sa2() -> None:
+            display.show_results(
+                data, reset_data, cfg.get("unsafe_password"), store=active_store
+            )
 
-            tab1, tab2 = st.tabs(["Data", "Config"])
-
-            with tab1:
-                display.show_results(data, reset_data, unsafe_password)
-
-            with tab2:
-                config.show_config()
-
-        show_sa2(data, reset_data, unsafe_password)
+        show_sa2()
 
 
 @contextmanager
 def track(
     unsafe_password: Optional[str] = None,
-    save_to_json: Optional[Union[str, Path]] = None,
-    load_from_json: Optional[Union[str, Path]] = None,
+    save_to_json: Optional[PathLike] = None,
+    load_from_json: Optional[PathLike] = None,
     firestore_project_name: Optional[str] = None,
     firestore_collection_name: Optional[str] = None,
     firestore_document_name: Optional[str] = "counts",
     firestore_key_file: Optional[str] = None,
     streamlit_secrets_firestore_key: Optional[str] = None,
     session_id: Optional[str] = None,
-    verbose=False,
-):
-    """
-    Context manager to start and stop tracking user inputs to a streamlit app.
+    verbose: bool = False,
+    *,
+    store_values: bool = False,
+    events_path: Optional[PathLike] = None,
+    store: Optional[storage.Store] = None,
+) -> Iterator[None]:
+    """Context manager to start and stop tracking user inputs to a streamlit app.
 
-    To use this, make calls to streamlit in `with streamlit_analytics.track():`.
+    To use this, make calls to streamlit in `with streamlit_analytics2.track():`.
     This also shows the analytics results below your app if you attach
     `?analytics=on` to the URL.
     """
-    if (
-        streamlit_secrets_firestore_key is not None
-        and firestore_project_name is not None
-    ):
-        start_tracking(
-            firestore_collection_name=firestore_collection_name,
-            firestore_document_name=firestore_document_name,
-            streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
-            firestore_project_name=firestore_project_name,
-            session_id=session_id,
-            verbose=verbose,
-        )
-
-    else:
-        start_tracking(
-            firestore_key_file=firestore_key_file,
-            firestore_collection_name=firestore_collection_name,
-            firestore_document_name=firestore_document_name,
-            load_from_json=load_from_json,
-            session_id=session_id,
-            verbose=verbose,
-        )
-    # Yield here to execute the code in the with statement. This will call the
-    # wrappers above, which track all inputs.
+    start_tracking(
+        unsafe_password=unsafe_password,
+        save_to_json=save_to_json,
+        load_from_json=load_from_json,
+        firestore_project_name=firestore_project_name,
+        firestore_collection_name=firestore_collection_name,
+        firestore_document_name=firestore_document_name,
+        firestore_key_file=firestore_key_file,
+        streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
+        session_id=session_id,
+        verbose=verbose,
+        store_values=store_values,
+        events_path=events_path,
+        store=store,
+    )
     yield
-    if (
-        streamlit_secrets_firestore_key is not None
-        and firestore_project_name is not None
-    ):
-        stop_tracking(
-            unsafe_password=unsafe_password,
-            firestore_collection_name=firestore_collection_name,
-            firestore_document_name=firestore_document_name,
-            streamlit_secrets_firestore_key=streamlit_secrets_firestore_key,
-            firestore_project_name=firestore_project_name,
-            session_id=session_id,
-            verbose=verbose,
-        )
-    else:
-        stop_tracking(
-            unsafe_password=unsafe_password,
-            save_to_json=save_to_json,
-            firestore_key_file=firestore_key_file,
-            firestore_collection_name=firestore_collection_name,
-            firestore_document_name=firestore_document_name,
-            verbose=verbose,
-            session_id=session_id,
-        )
+    stop_tracking(firestore_document_name=firestore_document_name)
 
 
-if __name__ == "streamlit_analytics2.main":
-    reset_data()
-
-    # widgets.copy_original()
-    # TODO need to fix the scope for this function call and then we can move
-    # these variable assignments to widgets.py
-
-    # Store original streamlit functions. They will be monkey-patched with some
-    # wrappers in `start_tracking` (see wrapper functions below).
-    _orig_button = st.button
-    _orig_checkbox = st.checkbox
-    _orig_radio = st.radio
-    _orig_selectbox = st.selectbox
-    _orig_multiselect = st.multiselect
-    _orig_slider = st.slider
-    _orig_select_slider = st.select_slider
-    _orig_text_input = st.text_input
-    _orig_number_input = st.number_input
-    _orig_text_area = st.text_area
-    _orig_date_input = st.date_input
-    _orig_time_input = st.time_input
-    _orig_file_uploader = st.file_uploader
-    _orig_color_picker = st.color_picker
-    # new elements, testing
-    # _orig_download_button = st.download_button
-    # _orig_link_button = st.link_button
-    # _orig_page_link = st.page_link
-    # _orig_toggle = st.toggle
-    # _orig_camera_input = st.camera_input
-    _orig_chat_input = st.chat_input
-    # _orig_searchbox = st_searchbox
-
-    _orig_sidebar_button = st.sidebar.button
-    _orig_sidebar_checkbox = st.sidebar.checkbox
-    _orig_sidebar_radio = st.sidebar.radio
-    _orig_sidebar_selectbox = st.sidebar.selectbox
-    _orig_sidebar_multiselect = st.sidebar.multiselect
-    _orig_sidebar_slider = st.sidebar.slider
-    _orig_sidebar_select_slider = st.sidebar.select_slider
-    _orig_sidebar_text_input = st.sidebar.text_input
-    _orig_sidebar_number_input = st.sidebar.number_input
-    _orig_sidebar_text_area = st.sidebar.text_area
-    _orig_sidebar_date_input = st.sidebar.date_input
-    _orig_sidebar_time_input = st.sidebar.time_input
-    _orig_sidebar_file_uploader = st.sidebar.file_uploader
-    _orig_sidebar_color_picker = st.sidebar.color_picker
-    # _orig_sidebar_searchbox = st.sidebar.st_searchbox
-    # new elements, testing
-    # _orig_sidebar_download_button = st.sidebar.download_button
-    # _orig_sidebar_link_button = st.sidebar.link_button
-    # _orig_sidebar_page_link = st.sidebar.page_link
-    # _orig_sidebar_toggle = st.sidebar.toggle
-    # _orig_sidebar_camera_input = st.sidebar.camera_input
+reset_data()
