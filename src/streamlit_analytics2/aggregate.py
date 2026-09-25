@@ -230,13 +230,17 @@ def summarize(
             }
             for h in hours
         ],
+        # Dense: every page has a point in every bucket, or stacked areas
+        # interpolate across the gaps and draw through each other.
         "series_day_pages": [
-            {"when": d, "page": pg, "views": n}
-            for (d, pg), n in sorted(page_views_day.items())
+            {"when": d, "page": pg, "views": page_views_day.get((d, pg), 0)}
+            for d in days
+            for pg in pages
         ],
         "series_hour_pages": [
-            {"when": h, "page": pg, "views": n}
-            for (h, pg), n in sorted(page_views_hour.items())
+            {"when": h, "page": pg, "views": page_views_hour.get((h, pg), 0)}
+            for h in hours
+            for pg in pages
         ],
         "load": [
             {"weekday": wd, "hour": h, "runs": n} for (wd, h), n in sorted(load.items())
