@@ -97,3 +97,17 @@ issue 13, issue 102, sidebar checkbox) so current users stop bleeding while
 4. Firestore moves to an optional extra `streamlit-analytics2[firestore]`.
 5. Config screen: scrap (recommended) or keep as read-only "current settings".
 6. Ship a 0.10.8 fix release first, or go straight to 1.0.
+
+## Decisions taken (Alfred, 2026-09-25)
+
+- Backward compatibility promise: every function and call signature that exists
+  in 0.10 keeps working until 1.0.0. 0.11.0 carries the new engine and the
+  patches behind the same API; 1.0.0 is where signatures change.
+- Private seams accepted with the guard and the Streamlit matrix.
+- Storage: JSONL default, SQLite second built-in (recommendation accepted by
+  default; revisit if Alfred objects).
+- Raw text values off by default, `store_values=True` to opt in.
+- Firestore becomes the `[firestore]` extra.
+- Config screen scrapped.
+- Dev container `sa2-dev` on Exodia, tailnet only: http://100.103.177.102:8227
+  (compose.dev.yml, branch dev/0.11).
