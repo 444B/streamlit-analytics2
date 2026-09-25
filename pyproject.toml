@@ -11,10 +11,11 @@ license = { file = "LICENSE" }
 readme = {file = ".github/README.md", content-type = "text/markdown"}
 keywords = ["streamlit", "analytics", "visualization", "streamlit-analytics", "streamlit-analytics2"]
 classifiers = [
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Database :: Front-Ends",
     "Topic :: Scientific/Engineering :: Visualization",
     "Topic :: Scientific/Engineering :: Information Analysis",

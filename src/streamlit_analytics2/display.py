@@ -455,7 +455,7 @@ def _present(df: pd.DataFrame, pal: Dict[str, Any]) -> None:
     )
     d = df.copy()
     if kind in ("Line", "Area") and not pd.api.types.is_numeric_dtype(d[x]):
-        parsed = pd.to_datetime(d[x], errors="coerce")
+        parsed = pd.to_datetime(d[x], errors="coerce", format="ISO8601")
         if parsed.notna().mean() > 0.8:
             d[x] = parsed
     if pd.api.types.is_datetime64_any_dtype(d[x]):
@@ -498,7 +498,7 @@ def _present(df: pd.DataFrame, pal: Dict[str, Any]) -> None:
         )
     elif kind == "Pie":
         d[x] = d[x].astype(str)
-        top = d.groupby(x, as_index=False)[y].sum().sort_values(by=y, ascending=False)
+        top = d.groupby(x)[y].sum().reset_index().sort_values(by=y, ascending=False)
         if len(top) > 7:
             rest = top.iloc[7:][y].sum()
             top = pd.concat([top.iloc[:7], pd.DataFrame({x: ["Other"], y: [rest]})])
