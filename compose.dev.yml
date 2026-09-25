@@ -16,3 +16,4 @@ services:
       - /mnt/user/appdata/sa2-dev/data:/data
     environment:
       - SA2_DATA_DIR=/data
+      - SA2_DASHBOARD_PASSWORD=sa2dev

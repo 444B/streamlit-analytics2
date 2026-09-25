@@ -70,8 +70,13 @@ def summarize(
     if since is not None:
         events = [e for e in events if e.parsed_ts() >= since]
     if page:
+        # Only what happened on that page; session facts for visits that saw it.
         keep = {e.session for e in events if e.kind == ev.PAGEVIEW and e.page == page}
-        events = [e for e in events if e.session in keep]
+        events = [
+            e
+            for e in events
+            if (e.kind == ev.SESSION and e.session in keep) or e.page == page
+        ]
 
     runs: Dict[str, List[datetime.datetime]] = defaultdict(list)
     interactions: Counter = Counter()
