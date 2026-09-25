@@ -18,7 +18,7 @@ from typing import Any, Dict, Iterator, List, Optional, Union, cast
 import streamlit as st
 from streamlit import session_state as ss
 
-from . import aggregate, capture, display
+from . import aggregate, capture, clientinfo, display
 from . import events as ev
 from . import firestore, storage, utils
 from .state import data, reset_data
@@ -71,6 +71,14 @@ def _visitor_id() -> Optional[str]:
         return None
     salt = datetime.date.today().isoformat()
     return hashlib.sha256(f"{salt}|{ip}|{ua}".encode()).hexdigest()[:16]
+
+
+def _dashboard_open() -> bool:
+    try:
+        qp = st.query_params
+        return "analytics" in qp and "on" in qp["analytics"]
+    except Exception:
+        return False
 
 
 def _session_id() -> str:
@@ -174,34 +182,24 @@ def start_tracking(
     first_run = not st.session_state.user_tracked
     _track_user()
 
-    # Traffic events: no patching involved.
+    # Traffic events: no patching involved. A run with the dashboard open is
+    # the app owner looking at analytics, not traffic, so it is not recorded.
     ctx = capture._ctx()
     sid = ctx.session_id if ctx is not None else "no-session"
     page = capture.page_of(ctx) if ctx is not None else None
     visitor = _visitor_id()
     now = ev.now_iso()
     pending: List[ev.Event] = []
-    if first_run:
-        props: Dict[str, Any] = {}
-        try:
-            props = {
-                k: v
-                for k, v in {
-                    "locale": st.context.locale,
-                    "timezone": st.context.timezone,
-                    "embedded": st.context.is_embedded,
-                }.items()
-                if v
-            }
-        except Exception:
-            log.debug("st.context unavailable", exc_info=True)
-        pending.append(
-            ev.Event(now, ev.SESSION, sid, visitor, page, props=props or None)
-        )
-    if first_run or st.session_state.get("_sa2_page") != page:
-        st.session_state["_sa2_page"] = page
-        pending.append(ev.Event(now, ev.PAGEVIEW, sid, visitor, page))
-    pending.append(ev.Event(now, ev.RUN, sid, visitor, page))
+    if not _dashboard_open():
+        if first_run:
+            props = clientinfo.session_props()
+            pending.append(
+                ev.Event(now, ev.SESSION, sid, visitor, page, props=props or None)
+            )
+        if first_run or st.session_state.get("_sa2_page") != page:
+            st.session_state["_sa2_page"] = page
+            pending.append(ev.Event(now, ev.PAGEVIEW, sid, visitor, page))
+        pending.append(ev.Event(now, ev.RUN, sid, visitor, page))
 
     st.session_state[_CFG] = cfg
     st.session_state[_PENDING] = pending
@@ -326,8 +324,7 @@ def stop_tracking(
         if cfg.get("verbose"):
             log.info("Storing results to file: %s", file_path)
 
-    query_params = st.query_params
-    if "analytics" in query_params and "on" in query_params["analytics"]:
+    if _dashboard_open():
 
         @st.dialog("Streamlit-Analytics2", width="large")
         def show_sa2() -> None:

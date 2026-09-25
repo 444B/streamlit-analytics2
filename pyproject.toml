@@ -28,6 +28,9 @@ dependencies = [
     "streamlit>=1.47.0",
     "pandas>=2.2.3",
     "altair>=5.5.0",
+    # Kept as a default dependency in 0.11 so upgrading Firestore users do not
+    # break; becomes extra-only in 1.0. Install the [firestore] extra to be ready.
+    "google-cloud-firestore>=2.19.0",
 ]
 
 [project.optional-dependencies]

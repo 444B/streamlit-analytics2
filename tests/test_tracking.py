@@ -229,3 +229,20 @@ def test_firestore_needs_the_extra(monkeypatch):
     monkeypatch.setitem(sys.modules, "google.cloud.firestore", None)
     with pytest.raises(ImportError, match=r"streamlit-analytics2\[firestore\]"):
         firestore._client("key.json", None, None)
+
+
+def test_dashboard_renders_with_events_and_range_switch():
+    at = _app()
+    at.button[0].click().run()
+    at.selectbox[0].select("dog").run()
+    at.query_params["analytics"] = "on"
+    at.run()
+    assert not at.exception, at.exception
+    runs_before = sa2.data["total_script_runs"]
+    # Dashboard runs are not traffic: no run event, no legacy script run.
+    assert sa2.data["total_script_runs"] == runs_before
+    kinds = [e.kind for e in main._memory_store.read()]
+    assert kinds.count("run") == 3
+    at.session_state["_sa2_range"] = "All time"
+    at.run()
+    assert not at.exception, at.exception

@@ -56,14 +56,33 @@ def test_open_store_picks_backend(tmp_path):
 
 
 def test_summarize():
-    s = summarize(_events())
-    assert s["sessions"] == 2 and s["visitors"] == 2
+    import datetime
+
+    now = datetime.datetime(2026, 9, 25, 11, 2, tzinfo=datetime.timezone.utc)
+    s = summarize(_events(), now=now)
+    assert s["views"] == 2 and s["visits"] == 2 and s["visitors"] == 2
     assert s["pages"] == [
-        {"page": "/", "pageviews": 1, "sessions": 1},
-        {"page": "/two", "pageviews": 1, "sessions": 1},
+        {"page": "/", "views": 1, "visits": 1},
+        {"page": "/two", "views": 1, "visits": 1},
     ]
     assert [w["label"] for w in s["widgets"]] == ["Go", "Pick"]
     assert s["widgets"][1]["top values"] == "dog (1)"
-    assert s["custom"] == [{"event": "report", "count": 1}]
-    assert s["avg_session_seconds"] == (360 + 1) / 2
+    assert s["custom"] == [{"event": "report", "count": 1, "visits": 1}]
+    assert s["bounce_rate"] == 0  # s1 interacted, s2 fired a custom event
+    assert s["active_now"] == 1  # s2 ran at 11:00, now is 11:02
+    assert s["series_day"] == [{"when": "2026-09-25", "views": 2, "visitors": 2}]
+    assert len(s["series_hour"]) == 2
+    assert s["load"] == [{"weekday": 4, "hour": 10, "runs": 0}] or s["load"] == []
     assert json.dumps(s)
+
+
+def test_summarize_filters_and_timezone():
+    import datetime
+
+    since = datetime.datetime(2026, 9, 25, 10, 30, tzinfo=datetime.timezone.utc)
+    s = summarize(_events(), since=since, tz_offset_minutes=-60)
+    assert s["visits"] == 1 and s["pages"][0]["page"] == "/two"
+    assert s["series_hour"][0]["when"] == "2026-09-25 12:00"  # UTC+1 viewer
+    s = summarize(_events(), page="/")
+    assert s["visits"] == 1 and s["custom"] == []
+    assert s["browsers"] == [] and s["timezones"] == []
