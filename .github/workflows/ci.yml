@@ -1,0 +1,60 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches-ignore: ['main']
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.10"
+      - run: uv sync --frozen --all-extras
+      - run: uv run black --check src tests examples/dev
+      - run: uv run isort --check-only src tests examples/dev
+      - run: uv run flake8 src tests examples/dev
+      - run: uv run mypy src/streamlit_analytics2 --config-file mypy.ini
+      - run: uv run bandit -q -c pyproject.toml -r src/streamlit_analytics2
+      - name: llms-full.txt is up to date
+        run: uv run python scripts/build_llms_full.py --check
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        streamlit: ["locked"]
+        include:
+          - python: "3.12"
+            streamlit: "1.47.*"   # the declared floor
+          - python: "3.12"
+            streamlit: "latest"
+    name: test py${{ matrix.python }} streamlit ${{ matrix.streamlit }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --frozen --all-extras
+      - if: matrix.streamlit == 'latest'
+        run: uv pip install --upgrade streamlit
+      - if: matrix.streamlit != 'locked' && matrix.streamlit != 'latest'
+        run: uv pip install "streamlit==${{ matrix.streamlit }}"
+      - run: uv run --no-sync python -c "import streamlit; print('streamlit', streamlit.__version__)"
+      - run: uv run --no-sync pytest -q --no-cov
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv build
+      - run: uvx twine check dist/*
+      - name: wheel installs and imports
+        run: |
+          uv venv /tmp/w && uv pip install --python /tmp/w/bin/python dist/*.whl
+          /tmp/w/bin/python -c "import streamlit_analytics2 as s; print(s.__version__)"
