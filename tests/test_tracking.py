@@ -112,7 +112,8 @@ def test_widgets_in_columns_forms_and_expanders_are_seen():
     at = _app()
     at.button[1].click().run()  # column button
     at.toggle[0].set_value(True).run()
-    at.text_area[0].set_value("hi").run()
+    # A form sends its widgets with the submit, so both go in one run.
+    at.text_area[0].set_value("hi")
     at.button[2].click().run()  # form submit
     at.multiselect[0].select("b").run()
     w = sa2.data["widgets"]

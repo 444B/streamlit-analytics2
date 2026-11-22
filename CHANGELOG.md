@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 (2026-11-22)
+
+- **Python 3.11 or newer.** Python 3.10 reached end of life in October 2026 and Pillow, which Streamlit depends on, ships security fixes only for 3.11 and newer (Pillow 13). Apps on Python 3.10 keep working on 0.11.1; nothing else changed in the API or the data files.
+- Security: the development lockfile now resolves Pillow 13.0.0, certifi 2026.11.20, pyasn1 0.6.5, opentelemetry-api 1.45.2 and black 26.10.1, clearing every open Dependabot advisory. The published package pins none of these.
+- Tooling: CI matrix is Python 3.11 to 3.14; lint and release run on 3.11. Every GitHub Action is pinned to an exact release by commit SHA and uv to 0.13.9; the publish job builds with uv and checks with the locked twine instead of unpinned `pip install`.
+
 ## 0.11.1 (2026-09-25)
 
 - Fix: the dashboard raised `altair_chart() got an unexpected keyword argument 'width'` on Streamlit versions before the chart `width` argument existed (1.47 and some later releases). Charts now fall back to `use_container_width` there. Found by the new CI matrix that tests the declared floor.

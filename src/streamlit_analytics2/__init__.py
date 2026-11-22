@@ -8,7 +8,7 @@ from .storage import JsonlStore, MemoryStore, SqliteStore  # noqa: F401
 
 logging.getLogger("streamlit_analytics2").addHandler(logging.NullHandler())
 
-__version__ = "0.11.1"
+__version__ = "0.12.0"
 __all__ = [
     "track",
     "start_tracking",

@@ -11,38 +11,31 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
-          python-version: '3.10'
-          cache: 'pip'
-      - name: Install and configure uv
-        run: |
-          pip install uv
-          uv venv
-          source .venv/bin/activate
-          uv pip install build hatchling twine
+          version: "0.13.9"
+          python-version: "3.11"
+          enable-cache: false
       - name: Build and check package
         run: |
-          source .venv/bin/activate
           rm -rf dist/ build/ src/*.egg-info/
-          python -m build
-          twine check dist/*
+          uv build
+          uv run --frozen --extra dev twine check dist/*
 
       - name: Upload to TestPyPI
         if: contains(github.ref, 'refs/heads/test/')
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           repository-url: https://test.pypi.org/legacy/
           verify-metadata: true
           skip-existing: true
-          
+
       - name: Upload to PyPI
         if: github.ref == 'refs/heads/main'
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           verify-metadata: true
           skip-existing: true

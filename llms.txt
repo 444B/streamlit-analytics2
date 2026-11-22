@@ -6,7 +6,7 @@
 > SQLite). No JavaScript, no cookies, no IP addresses stored.
 
 Package: `streamlit-analytics2` on PyPI. Import name: `streamlit_analytics2`.
-Python 3.10+, Streamlit 1.47+. MIT.
+Python 3.11+, Streamlit 1.47+. MIT.
 
 ## Minimal integration
 
