@@ -7,7 +7,7 @@ pip install streamlit-analytics2   # pip
 uv add streamlit-analytics2        # or uv
 ```
 
-Python 3.10 or newer, Streamlit 1.47 or newer.
+Python 3.11 or newer, Streamlit 1.47 or newer.
 
 ## 2. Wrap your app
 

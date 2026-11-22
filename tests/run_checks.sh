@@ -83,7 +83,7 @@ Examples:
     ./run_checks.sh --no-format --fix  # Run all checks except formatting in fix mode
 
 Environment Variables:
-    PYTHON_VERSION        Python version to use (default: 3.10)
+    PYTHON_VERSION        Python version to use (default: 3.11)
     COVERAGE_THRESHOLD    Minimum required coverage percentage (default: 80)
     CI                   Set to 'true' when running in CI environment
 

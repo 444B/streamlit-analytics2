@@ -15,7 +15,6 @@ keywords = [
     "streamlit-analytics", "streamlit-analytics2", "llm-apps", "ai-agents",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -28,7 +27,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "Development Status :: 4 - Beta"
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "streamlit>=1.47.0",
     "pandas>=2.2.3",
@@ -91,7 +90,7 @@ allow-direct-references = true
 
 [tool.black]
 line-length = 88
-target-version = ["py312"]
+target-version = ["py311"]
 include = '\.pyi?$'
 extend-exclude = '''
 # A regex preceded with ^/ will apply only to files and directories
@@ -109,7 +108,7 @@ ensure_newline_before_comments = true
 line_length = 88
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_configs = true

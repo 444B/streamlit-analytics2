@@ -1,5 +1,11 @@
 # Upgrading
 
+## From 0.11 to 0.12
+
+Nothing to change in code or data. 0.12 needs **Python 3.11 or newer**:
+Python 3.10 is end of life and Pillow, which Streamlit pulls in, no longer
+ships security fixes for it. On Python 3.10, pin `streamlit-analytics2<0.12`.
+
 ## From 0.10 to 0.11
 
 Nothing to change in code. Every function, argument, the `sa2.data` shape and
