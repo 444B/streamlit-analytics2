@@ -12,10 +12,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
-          python-version: "3.10"
+          version: "0.13.9"
+          python-version: "3.11"
       - run: uv sync --frozen --all-extras
       - run: uv run black --check src tests examples/dev
       - run: uv run isort --check-only src tests examples/dev
@@ -29,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python: ["3.11", "3.12", "3.13", "3.14"]
         streamlit: ["locked"]
         include:
           - python: "3.12"
@@ -38,9 +39,10 @@ jobs:
             streamlit: "latest"
     name: test py${{ matrix.python }} streamlit ${{ matrix.streamlit }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
+          version: "0.13.9"
           python-version: ${{ matrix.python }}
       - run: uv sync --frozen --all-extras
       - if: matrix.streamlit == 'latest'
@@ -52,10 +54,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: "0.13.9"
       - run: uv build
-      - run: uvx twine check dist/*
+      - run: uv run --frozen --extra dev twine check dist/*
       - name: wheel installs and imports
         run: |
           uv venv /tmp/w && uv pip install --python /tmp/w/bin/python dist/*.whl
